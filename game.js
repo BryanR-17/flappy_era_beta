@@ -7,32 +7,31 @@
    - ✅ VOXEL PIPES: pillars built from top/mid/bottom slices per era
    - ✅ SCORE FIX: only TOP pipe scores, so 1 point per pair
    - ✅ WIDTH FIX: voxel pillars render thicker to match old pipes
-   - Everything else unchanged
+   - ✅ SCALE FIX: game now auto-scales on GitHub Pages & desktop
    ========================================================= */
 
 const GAME_W = 420;
 const GAME_H = 640;
 
-// --- Easy scale tuning (change these if you want bigger/smaller)
+// --- Easy scale tuning
 const SCALES = {
-  MENU_PREVIEW: 0.28,   // menu center preview
-  SELECT_PREVIEW: 0.30, // big preview in select screen
-  SELECT_ICON: 0.05,    // small icons row
-  PLAYER: 0.15,         // in-game size
-  HITBOX: 0.70          // fraction of displayed sprite size
+  MENU_PREVIEW: 0.28,
+  SELECT_PREVIEW: 0.30,
+  SELECT_ICON: 0.05,
+  PLAYER: 0.15,
+  HITBOX: 0.70
 };
 
-// 🔥 Visual pillar thickness boost (fixes thin look from PNG padding)
-const PILLAR_WIDTH_MULT = 1.9; 
-// If you want even thicker, try 1.7. If too fat, try 1.35.
+// Thicker voxel pipes
+const PILLAR_WIDTH_MULT = 1.9;
 
-// --- Game-wide registry keys
+// Registry keys
 const REG = {
   CHARACTER: "character",
   HIGH_SCORE: "highScore",
 };
 
-// --- Characters
+// Characters
 const CHARACTERS = [
   { key: "dino",  name: "Dino",  file: "small_dino_101.png" },
   { key: "bird",  name: "Bird",  file: "small_duck_101.png" },
@@ -41,36 +40,12 @@ const CHARACTERS = [
   { key: "alien", name: "Alien", file: "small_alien_101.png" },
 ];
 
-// --- Eras (now with voxel background images)
+// Eras
 const ERAS = [
-  {
-    key: "prehistoric",
-    name: "Prehistoric",
-    bgKey: "bg_prehistoric",
-    bgFile: "prehistoric_voxel.png",
-    obstacleColor: 0x3f7f2e
-  },
-  {
-    key: "medieval",
-    name: "Medieval",
-    bgKey: "bg_medieval",
-    bgFile: "medieval_voxel.png",
-    obstacleColor: 0x6e6e6e
-  },
-  {
-    key: "cyberpunk",
-    name: "Cyberpunk",
-    bgKey: "bg_cyberpunk",
-    bgFile: "cyberpunk_voxel.png",
-    obstacleColor: 0x9b4dff
-  },
-  {
-    key: "space",
-    name: "Space",
-    bgKey: "bg_space",
-    bgFile: "space_voxel.png",
-    obstacleColor: 0xffffff
-  },
+  { key: "prehistoric", name: "Prehistoric", bgKey: "bg_prehistoric", bgFile: "prehistoric_voxel.png" },
+  { key: "medieval",    name: "Medieval",    bgKey: "bg_medieval",    bgFile: "medieval_voxel.png" },
+  { key: "cyberpunk",   name: "Cyberpunk",   bgKey: "bg_cyberpunk",   bgFile: "cyberpunk_voxel.png" },
+  { key: "space",       name: "Space",       bgKey: "bg_space",       bgFile: "space_voxel.png" }
 ];
 
 /* =========================================================
@@ -81,13 +56,9 @@ BootScene.prototype = Object.create(Phaser.Scene.prototype);
 BootScene.prototype.constructor = BootScene;
 
 BootScene.prototype.preload = function () {
-  // character sprites
   CHARACTERS.forEach(c => this.load.image(c.key, c.file));
-
-  // voxel era backgrounds
   ERAS.forEach(e => this.load.image(e.bgKey, e.bgFile));
 
-  // ✅ voxel pillar slices per era
   ERAS.forEach(e => {
     this.load.image(`${e.key}_pillar_top`,    `${e.key}_pillar_top.png`);
     this.load.image(`${e.key}_pillar_mid`,    `${e.key}_pillar_mid.png`);
@@ -100,13 +71,26 @@ BootScene.prototype.create = function () {
 };
 
 /* =========================================================
-   PHASER CONFIG
+   PHASER CONFIG (⭐ FIXED FOR GITHUB PAGES)
    ========================================================= */
 const config = {
   type: Phaser.AUTO,
   width: GAME_W,
   height: GAME_H,
-  physics: { default: "arcade", arcade: { gravity: { y: 900 }, debug: false }},
+
+  // ⭐ FIX: auto-scale & center properly
+  scale: {
+    mode: Phaser.Scale.FIT,
+    autoCenter: Phaser.Scale.CENTER_BOTH,
+    width: GAME_W,
+    height: GAME_H
+  },
+
+  physics: {
+    default: "arcade",
+    arcade: { gravity: { y: 900 }, debug: false }
+  },
+
   scene: [BootScene, MenuScene, CharacterSelectScene, PlayScene, GameOverScene]
 };
 new Phaser.Game(config);
@@ -191,7 +175,7 @@ CharacterSelectScene.prototype.create = function () {
     fontFamily: "Arial Black", fontSize: "20px", color: "#ffffff"
   }).setOrigin(0.5);
 
-  const startX = width/2 - 2*60;
+  const startX = width/2 - 2 * 60;
   const yRow = 430;
   const iconSprites = [];
 
@@ -215,7 +199,6 @@ CharacterSelectScene.prototype.create = function () {
       this.registry.set(REG.CHARACTER, selectedKey);
 
       preview.setTexture(c.key);
-      preview.setScale(SCALES.SELECT_PREVIEW);
       nameText.setText(c.name);
 
       iconSprites.forEach(o => o.bg.setStrokeStyle(2, 0xffffff));
@@ -250,7 +233,6 @@ PlayScene.prototype.create = function () {
   this.eraIndex = 0;
   this.applyEraVisuals();
 
-  // ✅ invisible 1x1 texture for physics pipe bodies
   if (!this.textures.exists("pipeBodyTex")) {
     const g = this.make.graphics({ x: 0, y: 0, add: false });
     g.fillStyle(0xffffff, 1);
@@ -286,16 +268,12 @@ PlayScene.prototype.create = function () {
     fontFamily: "Arial Black", fontSize: "16px", color: "#ffffff"
   }).setOrigin(0.5).setAlpha(0.8);
 
-  // Input flap (mouse/touch)
   this.input.on("pointerdown", () => {
-    if (this.isGameOver) return;
-    this.player.body.setVelocityY(-310);
+    if (!this.isGameOver) this.player.body.setVelocityY(-310);
   });
 
-  // Input flap (keyboard)
   this.input.keyboard.on("keydown", (e) => {
-    if (this.isGameOver) return;
-    if (e.code === "Space" || e.code === "ArrowUp") {
+    if (!this.isGameOver && (e.code === "Space" || e.code === "ArrowUp")) {
       this.player.body.setVelocityY(-310);
     }
   });
@@ -307,12 +285,18 @@ PlayScene.prototype.create = function () {
     loop: true
   });
 
-  this.physics.add.overlap(this.player, this.pipes, () => this.triggerGameOver(), null, this);
+  this.physics.add.overlap(
+    this.player,
+    this.pipes,
+    () => this.triggerGameOver(),
+    null,
+    this
+  );
 
   this.groundY = height - 40;
   this.ground = this.add.rectangle(width/2, this.groundY, width, 80, 0x000000).setAlpha(0);
   this.physics.add.existing(this.ground, true);
-  this.physics.add.collider(this.player, this.ground, () => this.triggerGameOver(), null, this);
+  this.physics.add.collider(this.player, this.ground, () => this.triggerGameOver());
 };
 
 PlayScene.prototype.update = function () {
@@ -322,13 +306,8 @@ PlayScene.prototype.update = function () {
   this.player.rotation = Phaser.Math.Clamp(vy / 600, -0.6, 0.9);
 
   this.pipes.getChildren().forEach(pipe => {
+    if (pipe.visual) pipe.visual.x = pipe.x;
 
-    // ✅ move visual container with physics body
-    if (pipe.visual) {
-      pipe.visual.x = pipe.x;
-    }
-
-    // ✅ SCORE ONLY TOP PIPE (1 per pair)
     if (pipe.isTop && !pipe.scored && pipe.x + pipe.displayWidth < this.player.x) {
       pipe.scored = true;
       this.incrementScore();
@@ -342,7 +321,7 @@ PlayScene.prototype.update = function () {
 };
 
 PlayScene.prototype.incrementScore = function () {
-  this.score += 1;
+  this.score++;
   this.scoreText.setText(this.score);
 
   if (this.score % 15 === 0) this.switchEra();
@@ -374,10 +353,9 @@ PlayScene.prototype.spawnPipePair = function () {
   const botY = centerY + halfGap;
   const botH = Math.max(height - botY - 40, 20);
 
-  const PIPE_W = 60;                 // collision width EXACTLY as old pipes
-  const VISUAL_W = PIPE_W * PILLAR_WIDTH_MULT; // thicker visuals
+  const PIPE_W = 60;
+  const VISUAL_W = PIPE_W * PILLAR_WIDTH_MULT;
 
-  // --- TOP PIPE physics body (invisible)
   const topBody = this.pipes.create(width + 60, topH / 2, "pipeBodyTex")
     .setDisplaySize(PIPE_W, topH)
     .setOrigin(0.5)
@@ -385,7 +363,6 @@ PlayScene.prototype.spawnPipePair = function () {
 
   topBody.body.setVelocityX(-this.pipeSpeed);
 
-  // --- BOTTOM PIPE physics body (invisible)
   const bottomBody = this.pipes.create(width + 60, botY + botH / 2, "pipeBodyTex")
     .setDisplaySize(PIPE_W, botH)
     .setOrigin(0.5)
@@ -393,22 +370,20 @@ PlayScene.prototype.spawnPipePair = function () {
 
   bottomBody.body.setVelocityX(-this.pipeSpeed);
 
-  // ✅ visuals built from slices (wider)
   const topVisual = buildVoxelPipe(this, eraKey, VISUAL_W, topH, true);
   topVisual.x = topBody.x;
-  topVisual.y = topH; // because it is flipped
+  topVisual.y = topH;
 
   const bottomVisual = buildVoxelPipe(this, eraKey, VISUAL_W, botH, false);
   bottomVisual.x = bottomBody.x;
   bottomVisual.y = botY;
 
-  // attach visuals to bodies so update() can sync x
   topBody.visual = topVisual;
   bottomBody.visual = bottomVisual;
 
-  // ✅ TAG WHICH PIPE SCORES
   topBody.isTop = true;
   bottomBody.isTop = false;
+
   topBody.scored = false;
   bottomBody.scored = false;
 };
@@ -433,7 +408,6 @@ PlayScene.prototype.switchEra = function () {
   this.eraText.setText(ERAS[this.eraIndex].name);
 };
 
-// ✅ voxel background per era
 PlayScene.prototype.applyEraVisuals = function () {
   const era = ERAS[this.eraIndex];
   const { width, height } = this.scale;
@@ -477,8 +451,11 @@ GameOverScene.prototype.create = function () {
   this.add.rectangle(width/2, height/2, width, height, 0x0d0d12);
 
   this.add.text(width/2, 140, "YOU TIME-LAPSED!", {
-    fontFamily: "Arial Black", fontSize: "30px",
-    color: "#ff7777", stroke: "#000000", strokeThickness: 6
+    fontFamily: "Arial Black",
+    fontSize: "30px",
+    color: "#ff7777",
+    stroke: "#000000",
+    strokeThickness: 6
   }).setOrigin(0.5);
 
   const hs = this.registry.get(REG.HIGH_SCORE);
@@ -509,7 +486,7 @@ GameOverScene.prototype.create = function () {
 };
 
 /* =========================================================
-   UI BUTTON HELPER
+   BUTTON MAKER
    ========================================================= */
 function makeButton(scene, x, y, w, h, color, label) {
   const btnBg = scene.add.rectangle(x, y, w, h, color)
@@ -517,7 +494,9 @@ function makeButton(scene, x, y, w, h, color, label) {
     .setInteractive({ useHandCursor: true });
 
   const btnText = scene.add.text(x, y, label, {
-    fontFamily: "Arial Black", fontSize: "18px", color: "#000000"
+    fontFamily: "Arial Black",
+    fontSize: "18px",
+    color: "#000000"
   }).setOrigin(0.5);
 
   btnBg.on("pointerover", () => btnBg.setScale(1.05));
@@ -528,7 +507,7 @@ function makeButton(scene, x, y, w, h, color, label) {
 }
 
 /* =========================================================
-   VOXEL PIPE BUILDER (top/mid/bottom tiling)
+   VOXEL PIPE BUILDER
    ========================================================= */
 function buildVoxelPipe(scene, eraKey, targetWidth, height, isTopPipe) {
   const topKey = `${eraKey}_pillar_top`;
@@ -537,7 +516,6 @@ function buildVoxelPipe(scene, eraKey, targetWidth, height, isTopPipe) {
 
   const container = scene.add.container(0, 0);
 
-  // create caps once to measure sizes
   const topCap = scene.add.sprite(0, 0, topKey);
   const botCap = scene.add.sprite(0, 0, botKey);
 
@@ -550,14 +528,12 @@ function buildVoxelPipe(scene, eraKey, targetWidth, height, isTopPipe) {
   const topCapH = topCap.displayHeight;
   const botCapH = botCap.displayHeight;
 
-  // place caps in local space
   topCap.y = topCapH / 2;
   botCap.y = height - botCapH / 2;
 
   container.add(topCap);
   container.add(botCap);
 
-  // mid tile sizing
   const midProbe = scene.add.sprite(0, 0, midKey);
   const wScaleMid = targetWidth / midProbe.width;
   midProbe.setScale(wScaleMid);
@@ -572,10 +548,7 @@ function buildVoxelPipe(scene, eraKey, targetWidth, height, isTopPipe) {
     container.add(mid);
   }
 
-  // flip top pipe so it hangs
-  if (isTopPipe) {
-    container.scaleY = -1;
-  }
+  if (isTopPipe) container.scaleY = -1;
 
   container.setDepth(2);
   return container;
