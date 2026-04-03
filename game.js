@@ -451,6 +451,8 @@ PlayScene.prototype.create = function () {
   this.isGameOver = false;
   this.hasStarted = false;
   this.score = 0;
+  this.runCoins = 0;
+  this.savedCoins = this.registry.get(REG.COINS) || loadCoins();
 
   this.basePipeSpeed = 185;
   this.maxPipeSpeed = 255;
@@ -504,6 +506,14 @@ PlayScene.prototype.create = function () {
   this.pipes = this.physics.add.group({ allowGravity: false, immovable: true });
   this.coins = this.physics.add.group({ allowGravity: false, immovable: true });
 
+  this.scorePanel = this.add.rectangle(width/2, 42, 150, 72, 0x000000, 0.32)
+    .setStrokeStyle(2, 0xffffff, 0.25);
+
+  this.scoreLabel = this.add.text(width/2, 23, "SCORE", {
+    fontFamily: "Arial Black", fontSize: "14px", color: "#d9f7ff"
+  }).setOrigin(0.5);
+
+
   this.scoreText = this.add.text(width/2, 40, "0", {
     fontFamily: "Arial Black", fontSize: "40px", color: "#ffffff",
     stroke: "#000000", strokeThickness: 6
@@ -514,10 +524,16 @@ PlayScene.prototype.create = function () {
   }).setOrigin(0.5).setAlpha(0.8);
 
   this.coinCount = this.registry.get(REG.COINS) || 0;
-  this.coinText = this.add.text(14, 14, `Coins: ${this.coinCount}`, {
+  this.runCoinText = this.add.text(14, 14, `Coins: ${this.coinCount}`, {
     fontFamily: "Arial Black", fontSize: "18px", color: "#ffd66b",
     stroke: "#000000", strokeThickness: 4
   }).setOrigin(0, 0);
+
+  this.scorePanel.setDepth(3);
+  this.scoreLabel.setDepth(4);
+  this.scoreText.setDepth(4);
+  this.eraText.setDepth(4);
+  this.runCoinText.setDepth(4);
 
   this.startPromptBg = this.add.rectangle(width/2, height - 120, 280, 80, 0x000000, 0.42)
     .setStrokeStyle(2, 0xffffff, 0.35);
@@ -533,6 +549,18 @@ PlayScene.prototype.create = function () {
 
   this.startPromptBg.setDepth(4);
   this.startPrompt.setDepth(5);
+
+  // Small burst used each time the bird flaps.
+  this.flapParticles = this.add.particles(0, 0, "pipeBodyTex", {
+    scale: { start: 5, end: 0 },
+    alpha: { start: 0.8, end: 0 },
+    lifespan: 260,
+    speedX: { min: -55, max: 25 },
+    speedY: { min: -45, max: 45 },
+    tint: [0xffffff, 0x8ee7ff, 0xfff3a1],
+    emitting: false
+  });
+  this.flapParticles.setDepth(1);
 
   this.idleFloatTween = this.tweens.add({
     targets: this.player,
@@ -623,10 +651,50 @@ PlayScene.prototype.handleFlapInput = function () {
   }
 
   this.player.body.setVelocityY(nextVelocity);
+  this.emitFlapParticles();
 
   if (this.player.y > this.player.displayHeight / 2 + 10) {
     this.player.y -= 2;
   }
+};
+
+PlayScene.prototype.emitFlapParticles = function () {
+  if (!this.flapParticles) return;
+
+  this.flapParticles.explode(
+    8,
+    this.player.x - this.player.displayWidth * 0.18,
+    this.player.y + this.player.displayHeight * 0.12
+  );
+};
+
+PlayScene.prototype.animateScoreUi = function () {
+  if (!this.scoreText || !this.scorePanel) return;
+
+  this.tweens.killTweensOf(this.scoreText);
+  this.tweens.killTweensOf(this.scorePanel);
+
+  this.scoreText.setScale(1);
+  this.scorePanel.setScale(1);
+  this.scorePanel.setAlpha(0.32);
+
+  this.tweens.add({
+    targets: this.scoreText,
+    scale: 1.14,
+    duration: 110,
+    yoyo: true,
+    ease: "Sine.easeOut"
+  });
+
+  this.tweens.add({
+    targets: this.scorePanel,
+    alpha: 0.55,
+    scaleX: 1.04,
+    scaleY: 1.08,
+    duration: 110,
+    yoyo: true,
+    ease: "Sine.easeOut"
+  });
 };
 
 PlayScene.prototype.startRun = function () {
@@ -697,6 +765,7 @@ PlayScene.prototype.refreshDifficulty = function () {
 PlayScene.prototype.incrementScore = function () {
   this.score++;
   this.scoreText.setText(this.score);
+  this.animateScoreUi();
 
   if (this.score % 15 === 0) this.switchEra();
   this.refreshDifficulty();
@@ -776,7 +845,7 @@ PlayScene.prototype.spawnPipePair = function () {
   }
 };
 
-PlayScene.prototype.collectCoin = function (sensor, coin) {
+PlayScene.prototype.collectCoin = function (_sensor, coin) {
   if (!coin || !coin.active) return;
 
   if (coin._bobTween) {
@@ -786,49 +855,80 @@ PlayScene.prototype.collectCoin = function (sensor, coin) {
 
   coin.destroy();
 
-  this.coinCount = (this.coinCount || 0) + 1;
-  this.registry.set(REG.COINS, this.coinCount);
-  saveCoins(this.coinCount);
+  this.runCoins += 1;
 
-  if (this.coinText) {
-    this.coinText.setText(`Coins: ${this.coinCount}`);
+  if (this.runCoinText) {
+    this.runCoinText.setText(`Run Coins: ${this.runCoins}`);
   }
 };
 
-PlayScene.prototype.applyEraVisuals = function () {
+PlayScene.prototype.applyEraVisuals = function (animateTransition) {
   const { width, height } = this.scale;
   const era = ERAS[this.eraIndex];
+  const oldBg = this.bg || null;
 
-  if (this.bg) {
-    this.bg.destroy();
-  }
+  const nextBg = this.add.image(width / 2, height / 2, era.bgKey);
 
-  this.bg = this.add.image(width / 2, height / 2, era.bgKey);
-
-  const scaleX = width / this.bg.width;
-  const scaleY = height / this.bg.height;
+  const scaleX = width / nextBg.width;
+  const scaleY = height / nextBg.height;
   const scale = Math.max(scaleX, scaleY);
 
-  this.bg.setScale(scale);
-  this.bg.setDepth(-10);
+  nextBg.setScale(scale);
+  nextBg.setDepth(-10);
+  nextBg.setAlpha(oldBg && animateTransition ? 0 : 1);
+
+  if (oldBg) oldBg.setDepth(-11);
+  this.bg = nextBg;
 
   if (this.eraText) {
     this.eraText.setText(era.name);
+    this.tweens.add({
+      targets: this.eraText,
+      alpha: 1,
+      scale: 1.08,
+      duration: 120,
+      yoyo: true,
+      ease: "Sine.easeOut"
+    });
   }
-  
+
+  if (oldBg && animateTransition) {
+    this.tweens.add({
+      targets: nextBg,
+      alpha: 1,
+      duration: 260,
+      ease: "Sine.easeOut"
+    });
+
+    this.tweens.add({
+      targets: oldBg,
+      alpha: 0,
+      duration: 260,
+      ease: "Sine.easeOut",
+      onComplete: () => oldBg.destroy()
+    });
+  } else if (oldBg) {
+    oldBg.destroy();
+  }
 };
+
 PlayScene.prototype.switchEra = function () {
   this.eraIndex = (this.eraIndex + 1) % ERAS.length;
-  console.log("Switching to era:", this.eraIndex, ERAS[this.eraIndex]);
-  this.applyEraVisuals();
+  this.applyEraVisuals(true);
 };
 
 PlayScene.prototype.triggerGameOver = function () {
   if (this.isGameOver) return;
   this.isGameOver = true;
 
+  this.cameras.main.shake(180, 0.008);
   this.physics.pause();
   if (this.pipeTimer) this.pipeTimer.remove();
+  if (this.flapParticles) this.flapParticles.stop();
+
+  this.savedCoins += this.runCoins;
+  this.registry.set(REG.COINS, this.savedCoins);
+  saveCoins(this.savedCoins);
 
   const hs = this.registry.get(REG.HIGH_SCORE);
   if (this.score > hs) this.registry.set(REG.HIGH_SCORE, this.score);
@@ -837,7 +937,6 @@ PlayScene.prototype.triggerGameOver = function () {
     this.scene.start("GameOverScene", { score: this.score });
   });
 };
-
 
 /* =========================================================
    GAME OVER SCENE
