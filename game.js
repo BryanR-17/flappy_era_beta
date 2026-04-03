@@ -819,6 +819,7 @@ PlayScene.prototype.applyEraVisuals = function () {
 
 PlayScene.prototype.switchEra = function () {
   this.eraIndex = (this.eraIndex + 1) % ERAS.length;
+  console.log("Switching to era:", this.eraIndex, ERAS[this.eraIndex]);
   this.applyEraVisuals();
 };
 
