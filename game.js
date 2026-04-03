@@ -1,13 +1,12 @@
 /* =========================================================
    FLAPPY ERAS — CLEAN MVP (Phaser 3) w/ REAL SPRITES
-   ---------------------------------------------------------
-   UPDATED:
-   - Era backgrounds now use voxel PNGs per era
-   - Background switches every era change
-   - ✅ VOXEL PIPES: pillars built from top/mid/bottom slices per era
-   - ✅ SCORE FIX: only TOP pipe scores, so 1 point per pair
-   - ✅ WIDTH FIX: voxel pillars render thicker to match old pipes
-   - ✅ SCALE FIX: game now auto-scales on GitHub Pages & desktop
+   + COINS (coin.png) + REAL SHOP SCREEN (buy/unlock characters)
+
+   ✅ THIS UPDATE:
+   - REMOVED moving clouds
+   - SHOP: no REFRESH button (only BACK)
+   - SHOP: characters a bit smaller (preview + card icons)
+   - Coins: collect when ANY part of character touches coin (sensor)
    ========================================================= */
 
 const GAME_W = 420;
@@ -29,6 +28,8 @@ const PILLAR_WIDTH_MULT = 1.9;
 const REG = {
   CHARACTER: "character",
   HIGH_SCORE: "highScore",
+  COINS: "coins",
+  UNLOCKED: "unlocked",
 };
 
 // Characters
@@ -39,6 +40,39 @@ const CHARACTERS = [
   { key: "cat",   name: "Cat",   file: "small_cat_101.png" },
   { key: "alien", name: "Alien", file: "small_alien_101.png" },
 ];
+
+// Shop prices
+const CHARACTER_COSTS = {
+  dino: 0,
+  bird: 25,
+  robot: 60,
+  cat: 40,
+  alien: 80
+};
+
+// LocalStorage keys
+const LS_KEYS = {
+  COINS: "flappyEras_coins",
+  UNLOCKED: "flappyEras_unlocked",
+};
+
+function loadCoins() {
+  return Number(localStorage.getItem(LS_KEYS.COINS) || 0);
+}
+function saveCoins(n) {
+  localStorage.setItem(LS_KEYS.COINS, String(n));
+}
+function loadUnlocked() {
+  try {
+    const arr = JSON.parse(localStorage.getItem(LS_KEYS.UNLOCKED) || '["dino"]');
+    return Array.isArray(arr) && arr.length ? arr : ["dino"];
+  } catch {
+    return ["dino"];
+  }
+}
+function saveUnlocked(arr) {
+  localStorage.setItem(LS_KEYS.UNLOCKED, JSON.stringify(arr));
+}
 
 // Eras
 const ERAS = [
@@ -64,6 +98,8 @@ BootScene.prototype.preload = function () {
     this.load.image(`${e.key}_pillar_mid`,    `${e.key}_pillar_mid.png`);
     this.load.image(`${e.key}_pillar_bottom`, `${e.key}_pillar_bottom.png`);
   });
+
+  this.load.image("coin", "coin.png");
 };
 
 BootScene.prototype.create = function () {
@@ -71,14 +107,13 @@ BootScene.prototype.create = function () {
 };
 
 /* =========================================================
-   PHASER CONFIG (⭐ FIXED FOR GITHUB PAGES)
+   PHASER CONFIG
    ========================================================= */
 const config = {
   type: Phaser.AUTO,
   width: GAME_W,
   height: GAME_H,
 
-  // ⭐ FIX: auto-scale & center properly
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
@@ -91,7 +126,7 @@ const config = {
     arcade: { gravity: { y: 900 }, debug: false }
   },
 
-  scene: [BootScene, MenuScene, CharacterSelectScene, PlayScene, GameOverScene]
+  scene: [BootScene, MenuScene, CharacterSelectScene, ShopScene, PlayScene, GameOverScene]
 };
 new Phaser.Game(config);
 
@@ -107,6 +142,8 @@ MenuScene.prototype.create = function () {
 
   if (!this.registry.has(REG.CHARACTER)) this.registry.set(REG.CHARACTER, "dino");
   if (!this.registry.has(REG.HIGH_SCORE)) this.registry.set(REG.HIGH_SCORE, 0);
+  if (!this.registry.has(REG.COINS)) this.registry.set(REG.COINS, loadCoins());
+  if (!this.registry.has(REG.UNLOCKED)) this.registry.set(REG.UNLOCKED, loadUnlocked());
 
   this.add.rectangle(width/2, height/2, width, height, 0x0e0e14);
 
@@ -120,7 +157,7 @@ MenuScene.prototype.create = function () {
   }).setOrigin(0.5);
 
   const selectedKey = this.registry.get(REG.CHARACTER);
-  const charObj = CHARACTERS.find(c => c.key === selectedKey);
+  const charObj = CHARACTERS.find(c => c.key === selectedKey) || CHARACTERS[0];
 
   const preview = this.add.sprite(width/2, 270, charObj.key)
     .setScale(SCALES.MENU_PREVIEW);
@@ -137,15 +174,23 @@ MenuScene.prototype.create = function () {
     fontFamily: "Arial Black", fontSize: "18px", color: "#ffffff"
   }).setOrigin(0.5);
 
-  const playBtn = makeButton(this, width/2, 420, 220, 60, 0x44dd77, "PLAY");
+  const playBtn = makeButton(this, width/2, 405, 220, 60, 0x44dd77, "PLAY");
   playBtn.on("pointerup", () => this.scene.start("PlayScene"));
 
-  const selectBtn = makeButton(this, width/2, 500, 220, 50, 0x5599ff, "SELECT CHARACTER");
+  const selectBtn = makeButton(this, width/2, 480, 220, 50, 0x5599ff, "SELECT");
   selectBtn.on("pointerup", () => this.scene.start("CharacterSelectScene"));
 
+  const shopBtn = makeButton(this, width/2, 540, 220, 50, 0xffd34d, "SHOP");
+  shopBtn.on("pointerup", () => this.scene.start("ShopScene"));
+
   const hs = this.registry.get(REG.HIGH_SCORE);
-  this.add.text(width/2, 580, `High Score: ${hs}`, {
+  this.add.text(width/2, 595, `High Score: ${hs}`, {
     fontFamily: "Arial Black", fontSize: "16px", color: "#ffef85"
+  }).setOrigin(0.5);
+
+  const coins = this.registry.get(REG.COINS) || 0;
+  this.add.text(width/2, 620, `Coins: ${coins}`, {
+    fontFamily: "Arial Black", fontSize: "14px", color: "#ffd66b"
   }).setOrigin(0.5);
 };
 
@@ -161,12 +206,21 @@ CharacterSelectScene.prototype.create = function () {
 
   this.add.rectangle(width/2, height/2, width, height, 0x13131b);
 
-  this.add.text(width/2, 80, "CHOOSE YOUR CHARACTER", {
-    fontFamily: "Arial Black", fontSize: "22px", color: "#ffffff"
+  this.add.text(width/2, 80, "SELECT CHARACTER", {
+    fontFamily: "Arial Black", fontSize: "24px", color: "#ffffff"
+  }).setOrigin(0.5);
+
+  const unlocked = this.registry.get(REG.UNLOCKED) || ["dino"];
+  const ownedChars = CHARACTERS.filter(c => unlocked.includes(c.key));
+  const coins = this.registry.get(REG.COINS) || 0;
+
+  this.add.text(width/2, 120, `Coins: ${coins}`, {
+    fontFamily: "Arial Black", fontSize: "18px", color: "#ffd66b"
   }).setOrigin(0.5);
 
   let selectedKey = this.registry.get(REG.CHARACTER);
-  let selectedObj = CHARACTERS.find(c => c.key === selectedKey);
+  if (!unlocked.includes(selectedKey)) selectedKey = "dino";
+  let selectedObj = CHARACTERS.find(c => c.key === selectedKey) || CHARACTERS[0];
 
   const preview = this.add.sprite(width/2, 230, selectedObj.key)
     .setScale(SCALES.SELECT_PREVIEW);
@@ -175,21 +229,23 @@ CharacterSelectScene.prototype.create = function () {
     fontFamily: "Arial Black", fontSize: "20px", color: "#ffffff"
   }).setOrigin(0.5);
 
-  const startX = width/2 - 2 * 60;
-  const yRow = 430;
-  const iconSprites = [];
+  const msg = this.add.text(width/2, 360, "Only owned characters show here.", {
+    fontFamily: "Arial", fontSize: "12px", color: "#cfcfe8"
+  }).setOrigin(0.5).setAlpha(0.9);
 
-  CHARACTERS.forEach((c, i) => {
-    const bg = this.add.rectangle(startX + i*60, yRow, 52, 52, 0x000000)
+  const iconSprites = [];
+  const count = ownedChars.length;
+  const spacing = 60;
+  const startX = width/2 - ((count - 1) * spacing)/2;
+  const yRow = 440;
+
+  ownedChars.forEach((c, i) => {
+    const bg = this.add.rectangle(startX + i*spacing, yRow, 52, 52, 0x000000)
       .setStrokeStyle(c.key === selectedKey ? 4 : 2, 0xffffff);
 
     const icon = this.add.sprite(bg.x, bg.y, c.key)
       .setScale(SCALES.SELECT_ICON)
       .setInteractive({ useHandCursor: true });
-
-    this.add.text(bg.x, bg.y + 34, c.name, {
-      fontFamily: "Arial", fontSize: "10px", color: "#ffffff"
-    }).setOrigin(0.5);
 
     iconSprites.push({ bg, icon });
 
@@ -203,13 +259,182 @@ CharacterSelectScene.prototype.create = function () {
 
       iconSprites.forEach(o => o.bg.setStrokeStyle(2, 0xffffff));
       bg.setStrokeStyle(4, 0xffffff);
+      msg.setText(`Selected ${c.name}`);
     });
   });
 
-  const useBtn = makeButton(this, width/2, 520, 240, 60, 0x44dd77, "USE CHARACTER");
-  useBtn.on("pointerup", () => this.scene.start("MenuScene"));
+  const shopBtn = makeButton(this, width/2, 520, 240, 60, 0xffd34d, "GO TO SHOP");
+  shopBtn.on("pointerup", () => this.scene.start("ShopScene"));
 
   const backBtn = makeButton(this, width/2, 590, 160, 45, 0x666677, "BACK");
+  backBtn.on("pointerup", () => this.scene.start("MenuScene"));
+};
+
+/* =========================================================
+   SHOP SCENE (NO REFRESH BUTTON)
+   ========================================================= */
+function ShopScene() { Phaser.Scene.call(this, { key: "ShopScene" }); }
+ShopScene.prototype = Object.create(Phaser.Scene.prototype);
+ShopScene.prototype.constructor = ShopScene;
+
+ShopScene.prototype.create = function () {
+  const { width, height } = this.scale;
+
+  this.add.rectangle(width/2, height/2, width, height, 0x101016);
+
+  this.add.text(width/2, 58, "SHOP", {
+    fontFamily: "Arial Black", fontSize: "34px", color: "#ffffff",
+    stroke: "#000000", strokeThickness: 6
+  }).setOrigin(0.5);
+
+  const coinsText = this.add.text(width/2, 95, "", {
+    fontFamily: "Arial Black", fontSize: "18px", color: "#ffd66b"
+  }).setOrigin(0.5);
+
+  const msg = this.add.text(width/2, 120, "", {
+    fontFamily: "Arial", fontSize: "14px", color: "#cfcfe8"
+  }).setOrigin(0.5).setAlpha(0.95);
+
+  const refreshHud = () => {
+    const coins = this.registry.get(REG.COINS) || 0;
+    coinsText.setText(`Coins: ${coins}`);
+  };
+  refreshHud();
+
+  // Preview (smaller)
+  const selectedKey = this.registry.get(REG.CHARACTER) || "dino";
+  const selectedObj = CHARACTERS.find(c => c.key === selectedKey) || CHARACTERS[0];
+
+  const preview = this.add.sprite(width/2, 235, selectedObj.key);
+
+  const PREVIEW_BOX_W = width * 0.66;
+  const PREVIEW_BOX_H = 170;
+  const fitPreview = () => {
+    const s = Math.min(PREVIEW_BOX_W / preview.width, PREVIEW_BOX_H / preview.height);
+    preview.setScale(s);
+  };
+  fitPreview();
+
+  const previewName = this.add.text(width/2, 328, selectedObj.name, {
+    fontFamily: "Arial Black", fontSize: "20px", color: "#ffffff"
+  }).setOrigin(0.5);
+
+  // Grid
+  const cols = 3;
+  const cellW = 132;
+  const cellH = 105;
+  const cardW = 118;
+  const cardH = 100;
+  const gridTop = 395;
+
+  const renderCard = (c, idx) => {
+    const col = idx % cols;
+    const row = Math.floor(idx / cols);
+    const cx = width/2 + (col - 1) * cellW;
+    const cy = gridTop + row * cellH;
+
+    const card = this.add.rectangle(cx, cy, cardW, cardH, 0x000000, 0.35)
+      .setStrokeStyle(2, 0xffffff);
+
+    // icon (smaller)
+    const icon = this.add.sprite(cx, cy - 25, c.key);
+    const iconMaxW = cardW * 0.50;
+    const iconMaxH = cardH * 0.38;
+    const iconScale = Math.min(iconMaxW / icon.width, iconMaxH / icon.height);
+    icon.setScale(iconScale);
+
+    // name
+    this.add.text(cx, cy + 4, c.name, {
+      fontFamily: "Arial Black", fontSize: "12px", color: "#ffffff"
+    }).setOrigin(0.5);
+
+    const cost = CHARACTER_COSTS[c.key] ?? 0;
+
+    // price
+    const priceText = this.add.text(cx, cy + 22, "", {
+      fontFamily: "Arial Black", fontSize: "12px", color: "#ffd66b"
+    }).setOrigin(0.5);
+
+    // button inside card (no hover grow)
+    const btn = makeButton(this, cx, cy + 42, 92, 22, 0xffd34d, "BUY", {
+      fontSize: 12,
+      hoverScale: 1.0
+    });
+
+    const updateCard = () => {
+      const coins = this.registry.get(REG.COINS) || 0;
+      const unlocked = this.registry.get(REG.UNLOCKED) || ["dino"];
+      const owned = unlocked.includes(c.key);
+
+      if (owned) {
+        icon.clearTint();
+        card.setStrokeStyle(2, 0x44dd77);
+        btn.text.setText("SELECT");
+        priceText.setText("OWNED");
+      } else {
+        icon.setTint(0x777777);
+        card.setStrokeStyle(2, 0xffffff);
+        btn.text.setText("BUY");
+        priceText.setText(`${cost} coins`);
+      }
+
+      btn.setAlpha(!owned && coins < cost ? 0.7 : 1);
+    };
+
+    btn.on("pointerup", () => {
+      let coins = this.registry.get(REG.COINS) || 0;
+      let unlocked = this.registry.get(REG.UNLOCKED) || ["dino"];
+      const owned = unlocked.includes(c.key);
+
+      if (owned) {
+        this.registry.set(REG.CHARACTER, c.key);
+        preview.setTexture(c.key);
+        fitPreview();
+        previewName.setText(c.name);
+        msg.setText(`Selected ${c.name}`);
+        return;
+      }
+
+      if (coins < cost) {
+        msg.setText(`Not enough coins. Need ${cost - coins} more.`);
+        return;
+      }
+
+      coins -= cost;
+      unlocked = [...unlocked, c.key];
+
+      this.registry.set(REG.COINS, coins);
+      this.registry.set(REG.UNLOCKED, unlocked);
+      saveCoins(coins);
+      saveUnlocked(unlocked);
+
+      msg.setText(`Unlocked ${c.name}!`);
+      refreshHud();
+      updateCard();
+    });
+
+    const previewThis = () => {
+      preview.setTexture(c.key);
+      fitPreview();
+      previewName.setText(c.name);
+      msg.setText(`Previewing ${c.name}`);
+    };
+
+    card.setInteractive({ useHandCursor: true }).on("pointerup", previewThis);
+    icon.setInteractive({ useHandCursor: true }).on("pointerup", previewThis);
+
+    updateCard();
+    return updateCard;
+  };
+
+  CHARACTERS.forEach((c, i) => renderCard(c, i));
+
+  // ONLY BACK button
+  const backBtn = makeButton(this, width/2, 623, 170, 34, 0x666677, "BACK", {
+    fontSize: 16,
+    hoverScale: 1.02
+  });
+
   backBtn.on("pointerup", () => this.scene.start("MenuScene"));
 };
 
@@ -233,6 +458,7 @@ PlayScene.prototype.create = function () {
   this.eraIndex = 0;
   this.applyEraVisuals();
 
+  // Pipe body texture for invisible collision boxes
   if (!this.textures.exists("pipeBodyTex")) {
     const g = this.make.graphics({ x: 0, y: 0, add: false });
     g.fillStyle(0xffffff, 1);
@@ -241,23 +467,28 @@ PlayScene.prototype.create = function () {
     g.destroy();
   }
 
-  const selectedKey = this.registry.get(REG.CHARACTER);
-  const charObj = CHARACTERS.find(c => c.key === selectedKey);
+  const selectedKey = this.registry.get(REG.CHARACTER) || "dino";
+  const charObj = CHARACTERS.find(c => c.key === selectedKey) || CHARACTERS[0];
 
   this.player = this.physics.add.sprite(110, height/2, charObj.key);
   this.player.setScale(SCALES.PLAYER);
   this.player.body.setCollideWorldBounds(true);
 
+  // pipes: slightly smaller hitbox
   this.player.body.setSize(
     this.player.displayWidth * SCALES.HITBOX,
     this.player.displayHeight * SCALES.HITBOX,
     true
   );
 
-  this.pipes = this.physics.add.group({
-    allowGravity: false,
-    immovable: true
-  });
+  // coin sensor: FULL character size so ANY part touching coin collects it
+  this.coinSensor = this.physics.add.sprite(this.player.x, this.player.y, "pipeBodyTex").setAlpha(0);
+  this.coinSensor.body.setAllowGravity(false);
+  this.coinSensor.body.setImmovable(true);
+  this.coinSensor.body.setSize(this.player.displayWidth, this.player.displayHeight, true);
+
+  this.pipes = this.physics.add.group({ allowGravity: false, immovable: true });
+  this.coins = this.physics.add.group({ allowGravity: false, immovable: true });
 
   this.scoreText = this.add.text(width/2, 40, "0", {
     fontFamily: "Arial Black", fontSize: "40px", color: "#ffffff",
@@ -267,6 +498,12 @@ PlayScene.prototype.create = function () {
   this.eraText = this.add.text(width/2, 80, ERAS[this.eraIndex].name, {
     fontFamily: "Arial Black", fontSize: "16px", color: "#ffffff"
   }).setOrigin(0.5).setAlpha(0.8);
+
+  this.coinCount = this.registry.get(REG.COINS) || 0;
+  this.coinText = this.add.text(14, 14, `Coins: ${this.coinCount}`, {
+    fontFamily: "Arial Black", fontSize: "18px", color: "#ffd66b",
+    stroke: "#000000", strokeThickness: 4
+  }).setOrigin(0, 0);
 
   this.input.on("pointerdown", () => {
     if (!this.isGameOver) this.player.body.setVelocityY(-310);
@@ -285,13 +522,8 @@ PlayScene.prototype.create = function () {
     loop: true
   });
 
-  this.physics.add.overlap(
-    this.player,
-    this.pipes,
-    () => this.triggerGameOver(),
-    null,
-    this
-  );
+  this.physics.add.overlap(this.player, this.pipes, () => this.triggerGameOver(), null, this);
+  this.physics.add.overlap(this.coinSensor, this.coins, this.collectCoin, null, this);
 
   this.groundY = height - 40;
   this.ground = this.add.rectangle(width/2, this.groundY, width, 80, 0x000000).setAlpha(0);
@@ -304,6 +536,10 @@ PlayScene.prototype.update = function () {
 
   const vy = this.player.body.velocity.y;
   this.player.rotation = Phaser.Math.Clamp(vy / 600, -0.6, 0.9);
+
+  // keep sensor glued to player
+  this.coinSensor.x = this.player.x;
+  this.coinSensor.y = this.player.y;
 
   this.pipes.getChildren().forEach(pipe => {
     if (pipe.visual) pipe.visual.x = pipe.x;
@@ -318,6 +554,30 @@ PlayScene.prototype.update = function () {
       pipe.destroy();
     }
   });
+
+  this.coins.getChildren().forEach(c => {
+    if (c.x < -120) {
+      if (c._bobTween) c._bobTween.stop();
+      c.destroy();
+    }
+  });
+};
+
+// coin collect
+PlayScene.prototype.collectCoin = function (_sensor, coin) {
+  if (!coin || !coin.active) return;
+
+  if (coin._bobTween) {
+    coin._bobTween.stop();
+    coin._bobTween = null;
+  }
+
+  coin.disableBody(true, true);
+
+  this.coinCount += 1;
+  this.registry.set(REG.COINS, this.coinCount);
+  saveCoins(this.coinCount);
+  this.coinText.setText(`Coins: ${this.coinCount}`);
 };
 
 PlayScene.prototype.incrementScore = function () {
@@ -360,14 +620,12 @@ PlayScene.prototype.spawnPipePair = function () {
     .setDisplaySize(PIPE_W, topH)
     .setOrigin(0.5)
     .setAlpha(0);
-
   topBody.body.setVelocityX(-this.pipeSpeed);
 
   const bottomBody = this.pipes.create(width + 60, botY + botH / 2, "pipeBodyTex")
     .setDisplaySize(PIPE_W, botH)
     .setOrigin(0.5)
     .setAlpha(0);
-
   bottomBody.body.setVelocityX(-this.pipeSpeed);
 
   const topVisual = buildVoxelPipe(this, eraKey, VISUAL_W, topH, true);
@@ -383,9 +641,38 @@ PlayScene.prototype.spawnPipePair = function () {
 
   topBody.isTop = true;
   bottomBody.isTop = false;
-
   topBody.scored = false;
   bottomBody.scored = false;
+
+  const coinSpawnChance = 0.7;
+  if (Math.random() < coinSpawnChance) {
+    const coinYMin = topH + 45;
+    const coinYMax = botY - 45;
+
+    if (coinYMax > coinYMin) {
+      const coinY = Phaser.Math.Between(coinYMin, coinYMax);
+
+      const coin = this.coins.create(width + 60, coinY, "coin");
+      coin.setScale(0.10);
+      coin.body.setAllowGravity(false);
+
+      coin.body.setSize(
+        Math.max(40, coin.displayWidth * 2.0),
+        Math.max(40, coin.displayHeight * 2.0),
+        true
+      );
+
+      coin.body.setVelocityX(-this.pipeSpeed);
+
+      coin._bobTween = this.tweens.add({
+        targets: coin,
+        y: coin.y - 8,
+        duration: 600,
+        yoyo: true,
+        repeat: -1
+      });
+    }
+  }
 };
 
 PlayScene.prototype.switchEra = function () {
@@ -459,6 +746,7 @@ GameOverScene.prototype.create = function () {
   }).setOrigin(0.5);
 
   const hs = this.registry.get(REG.HIGH_SCORE);
+  const coins = this.registry.get(REG.COINS) || 0;
 
   this.add.text(width/2, 230, `Score: ${this.finalScore}`, {
     fontFamily: "Arial Black", fontSize: "24px", color: "#ffffff"
@@ -468,39 +756,45 @@ GameOverScene.prototype.create = function () {
     fontFamily: "Arial Black", fontSize: "18px", color: "#ffef85"
   }).setOrigin(0.5);
 
+  this.add.text(width/2, 300, `Coins: ${coins}`, {
+    fontFamily: "Arial Black", fontSize: "16px", color: "#ffd66b"
+  }).setOrigin(0.5);
+
   const replayBtn = makeButton(this, width/2, 360, 220, 60, 0x44dd77, "REPLAY");
   replayBtn.on("pointerup", () => this.scene.start("PlayScene"));
 
-  const charBtn = makeButton(this, width/2, 440, 240, 55, 0x5599ff, "CHANGE CHARACTER");
+  const charBtn = makeButton(this, width/2, 435, 240, 55, 0x5599ff, "SELECT");
   charBtn.on("pointerup", () => this.scene.start("CharacterSelectScene"));
 
-  const menuBtn = makeButton(this, width/2, 515, 160, 45, 0x666677, "MENU");
+  const shopBtn = makeButton(this, width/2, 500, 240, 55, 0xffd34d, "SHOP");
+  shopBtn.on("pointerup", () => this.scene.start("ShopScene"));
+
+  const menuBtn = makeButton(this, width/2, 565, 160, 45, 0x666677, "MENU");
   menuBtn.on("pointerup", () => this.scene.start("MenuScene"));
-
-  const adSlot = this.add.rectangle(width/2, height - 30, width, 60, 0x222233)
-    .setStrokeStyle(2, 0x444455);
-
-  this.add.text(width/2, height - 30, "AD BANNER SLOT", {
-    fontFamily: "Arial", fontSize: "14px", color: "#aaaaaa"
-  }).setOrigin(0.5);
 };
 
 /* =========================================================
-   BUTTON MAKER
+   BUTTON MAKER (supports options)
    ========================================================= */
-function makeButton(scene, x, y, w, h, color, label) {
+function makeButton(scene, x, y, w, h, color, label, opts = {}) {
+  const hoverScale = typeof opts.hoverScale === "number" ? opts.hoverScale : 1.05;
+  const fontSize = typeof opts.fontSize === "number" ? opts.fontSize : 18;
+  const textColor = opts.textColor || "#000000";
+
   const btnBg = scene.add.rectangle(x, y, w, h, color)
     .setStrokeStyle(4, 0xffffff)
     .setInteractive({ useHandCursor: true });
 
   const btnText = scene.add.text(x, y, label, {
     fontFamily: "Arial Black",
-    fontSize: "18px",
-    color: "#000000"
+    fontSize: `${fontSize}px`,
+    color: textColor
   }).setOrigin(0.5);
 
-  btnBg.on("pointerover", () => btnBg.setScale(1.05));
-  btnBg.on("pointerout", () => btnBg.setScale(1));
+  if (hoverScale !== 1.0) {
+    btnBg.on("pointerover", () => btnBg.setScale(hoverScale));
+    btnBg.on("pointerout", () => btnBg.setScale(1));
+  }
 
   btnBg.text = btnText;
   return btnBg;
