@@ -449,11 +449,23 @@ PlayScene.prototype.create = function () {
   const { width, height } = this.scale;
 
   this.isGameOver = false;
+  this.hasStarted = false;
   this.score = 0;
 
-  this.pipeSpeed = 200;
-  this.pipeGap = 190;
-  this.pipeSpawnDelay = 1500;
+  this.basePipeSpeed = 185;
+  this.maxPipeSpeed = 255;
+  this.basePipeGap = 200;
+  this.minPipeGap = 150;
+  this.basePipeSpawnDelay = 1500;
+  this.minPipeSpawnDelay = 1200;
+  this.firstPipeDelay = 1100;
+  this.jumpVelocity = -305;
+  this.fallJumpVelocity = -335;
+
+  this.pipeSpeed = this.basePipeSpeed;
+  this.pipeGap = this.basePipeGap;
+  this.pipeSpawnDelay = this.basePipeSpawnDelay;
+  this.pipeTimer = null;
 
   this.eraIndex = 0;
   this.applyEraVisuals();
@@ -473,6 +485,8 @@ PlayScene.prototype.create = function () {
   this.player = this.physics.add.sprite(110, height/2, charObj.key);
   this.player.setScale(SCALES.PLAYER);
   this.player.body.setCollideWorldBounds(true);
+  this.player.body.setAllowGravity(false);
+  this.player.body.setVelocity(0, 0);
 
   // pipes: slightly smaller hitbox
   this.player.body.setSize(
@@ -505,21 +519,47 @@ PlayScene.prototype.create = function () {
     stroke: "#000000", strokeThickness: 4
   }).setOrigin(0, 0);
 
+  this.startPromptBg = this.add.rectangle(width/2, height - 120, 280, 80, 0x000000, 0.42)
+    .setStrokeStyle(2, 0xffffff, 0.35);
+
+  this.startPrompt = this.add.text(width/2, height - 120, "Tap to Start\nPress Space to Start", {
+    fontFamily: "Arial Black",
+    fontSize: "22px",
+    color: "#ffffff",
+    align: "center",
+    stroke: "#000000",
+    strokeThickness: 6
+  }).setOrigin(0.5);
+
+  this.startPromptBg.setDepth(4);
+  this.startPrompt.setDepth(5);
+
+  this.idleFloatTween = this.tweens.add({
+    targets: this.player,
+    y: this.player.y + 12,
+    duration: 900,
+    yoyo: true,
+    repeat: -1,
+    ease: "Sine.easeInOut"
+  });
+
+  this.startPromptTween = this.tweens.add({
+    targets: [this.startPromptBg, this.startPrompt],
+    alpha: 0.72,
+    duration: 850,
+    yoyo: true,
+    repeat: -1,
+    ease: "Sine.easeInOut"
+  });
+
   this.input.on("pointerdown", () => {
-    if (!this.isGameOver) this.player.body.setVelocityY(-310);
+    this.handleFlapInput();
   });
 
   this.input.keyboard.on("keydown", (e) => {
-    if (!this.isGameOver && (e.code === "Space" || e.code === "ArrowUp")) {
-      this.player.body.setVelocityY(-310);
+    if (e.code === "Space" || e.code === "ArrowUp") {
+      this.handleFlapInput();
     }
-  });
-
-  this.pipeTimer = this.time.addEvent({
-    delay: this.pipeSpawnDelay,
-    callback: this.spawnPipePair,
-    callbackScope: this,
-    loop: true
   });
 
   this.physics.add.overlap(this.player, this.pipes, () => this.triggerGameOver(), null, this);
@@ -534,12 +574,17 @@ PlayScene.prototype.create = function () {
 PlayScene.prototype.update = function () {
   if (this.isGameOver) return;
 
-  const vy = this.player.body.velocity.y;
-  this.player.rotation = Phaser.Math.Clamp(vy / 600, -0.6, 0.9);
-
   // keep sensor glued to player
   this.coinSensor.x = this.player.x;
   this.coinSensor.y = this.player.y;
+
+  if (!this.hasStarted) {
+    this.player.rotation = -0.12;
+    return;
+  }
+
+  const vy = this.player.body.velocity.y;
+  this.player.rotation = Phaser.Math.Clamp(vy / 700, -0.5, 0.85);
 
   this.pipes.getChildren().forEach(pipe => {
     if (pipe.visual) pipe.visual.x = pipe.x;
@@ -563,21 +608,90 @@ PlayScene.prototype.update = function () {
   });
 };
 
-// coin collect
-PlayScene.prototype.collectCoin = function (_sensor, coin) {
-  if (!coin || !coin.active) return;
+PlayScene.prototype.handleFlapInput = function () {
+  if (this.isGameOver) return;
 
-  if (coin._bobTween) {
-    coin._bobTween.stop();
-    coin._bobTween = null;
+  if (!this.hasStarted) this.startRun();
+
+  const currentVelocity = this.player.body.velocity.y;
+  let nextVelocity = this.jumpVelocity;
+
+  if (currentVelocity > 140) {
+    nextVelocity = this.fallJumpVelocity;
+  } else if (currentVelocity < -180) {
+    nextVelocity = -285;
   }
 
-  coin.disableBody(true, true);
+  this.player.body.setVelocityY(nextVelocity);
 
-  this.coinCount += 1;
-  this.registry.set(REG.COINS, this.coinCount);
-  saveCoins(this.coinCount);
-  this.coinText.setText(`Coins: ${this.coinCount}`);
+  if (this.player.y > this.player.displayHeight / 2 + 10) {
+    this.player.y -= 2;
+  }
+};
+
+PlayScene.prototype.startRun = function () {
+  if (this.hasStarted) return;
+  this.hasStarted = true;
+
+  if (this.idleFloatTween) {
+    this.idleFloatTween.stop();
+    this.idleFloatTween = null;
+  }
+
+  if (this.startPromptTween) {
+    this.startPromptTween.stop();
+    this.startPromptTween = null;
+  }
+
+  this.player.body.reset(this.player.x, this.player.y);
+  this.player.body.setAllowGravity(true);
+
+  this.tweens.add({
+    targets: [this.startPromptBg, this.startPrompt],
+    alpha: 0,
+    duration: 180,
+    onComplete: () => {
+      if (this.startPromptBg) this.startPromptBg.destroy();
+      if (this.startPrompt) this.startPrompt.destroy();
+      this.startPromptBg = null;
+      this.startPrompt = null;
+    }
+  });
+
+  this.scheduleNextPipe(this.firstPipeDelay);
+};
+
+PlayScene.prototype.scheduleNextPipe = function (delay) {
+  if (!this.hasStarted || this.isGameOver) return;
+
+  if (this.pipeTimer) {
+    this.pipeTimer.remove();
+    this.pipeTimer = null;
+  }
+
+  this.pipeTimer = this.time.delayedCall(delay, () => {
+    this.pipeTimer = null;
+    if (this.isGameOver) return;
+    this.spawnPipePair();
+    this.scheduleNextPipe(this.pipeSpawnDelay);
+  });
+};
+
+PlayScene.prototype.refreshDifficulty = function () {
+  const rampProgress = Phaser.Math.Clamp((this.score - 5) / 30, 0, 1);
+  const easedProgress = 1 - Math.pow(1 - rampProgress, 1.35);
+
+  this.pipeSpeed = Math.round(Phaser.Math.Linear(this.basePipeSpeed, this.maxPipeSpeed, easedProgress));
+  this.pipeGap = Math.round(Phaser.Math.Linear(this.basePipeGap, this.minPipeGap, easedProgress));
+  this.pipeSpawnDelay = Math.round(Phaser.Math.Linear(this.basePipeSpawnDelay, this.minPipeSpawnDelay, easedProgress));
+
+  this.pipes.getChildren().forEach(pipe => {
+    if (pipe.body) pipe.body.setVelocityX(-this.pipeSpeed);
+  });
+
+  this.coins.getChildren().forEach(coin => {
+    if (coin.body) coin.body.setVelocityX(-this.pipeSpeed);
+  });
 };
 
 PlayScene.prototype.incrementScore = function () {
@@ -585,20 +699,7 @@ PlayScene.prototype.incrementScore = function () {
   this.scoreText.setText(this.score);
 
   if (this.score % 15 === 0) this.switchEra();
-
-  if (this.score % 10 === 0) {
-    this.pipeSpeed += 10;
-    this.pipeGap = Math.max(120, this.pipeGap - 8);
-    this.pipeSpawnDelay = Math.max(1050, this.pipeSpawnDelay - 35);
-
-    this.pipeTimer.remove();
-    this.pipeTimer = this.time.addEvent({
-      delay: this.pipeSpawnDelay,
-      callback: this.spawnPipePair,
-      callbackScope: this,
-      loop: true
-    });
-  }
+  this.refreshDifficulty();
 };
 
 PlayScene.prototype.spawnPipePair = function () {
@@ -606,8 +707,8 @@ PlayScene.prototype.spawnPipePair = function () {
   const era = ERAS[this.eraIndex];
   const eraKey = era.key;
 
-  const centerY = Phaser.Math.Between(160, height - 180);
   const halfGap = this.pipeGap / 2;
+  const centerY = Phaser.Math.Between(130 + halfGap, height - 140 - halfGap);
 
   const topH = Math.max(centerY - halfGap, 20);
   const botY = centerY + halfGap;
@@ -675,43 +776,12 @@ PlayScene.prototype.spawnPipePair = function () {
   }
 };
 
-PlayScene.prototype.switchEra = function () {
-  this.eraIndex = (this.eraIndex + 1) % ERAS.length;
-
-  const overlay = this.add.rectangle(
-    this.scale.width/2, this.scale.height/2,
-    this.scale.width, this.scale.height, 0xffffff
-  ).setAlpha(0);
-
-  this.tweens.add({
-    targets: overlay,
-    alpha: 0.7,
-    duration: 180,
-    yoyo: true,
-    onComplete: () => overlay.destroy()
-  });
-
-  this.applyEraVisuals();
-  this.eraText.setText(ERAS[this.eraIndex].name);
-};
-
-PlayScene.prototype.applyEraVisuals = function () {
-  const era = ERAS[this.eraIndex];
-  const { width, height } = this.scale;
-
-  if (this.bgImage) this.bgImage.destroy();
-
-  this.bgImage = this.add.image(width/2, height/2, era.bgKey)
-    .setDisplaySize(width, height)
-    .setDepth(-10);
-};
-
 PlayScene.prototype.triggerGameOver = function () {
   if (this.isGameOver) return;
   this.isGameOver = true;
 
   this.physics.pause();
-  this.pipeTimer.remove();
+  if (this.pipeTimer) this.pipeTimer.remove();
 
   const hs = this.registry.get(REG.HIGH_SCORE);
   if (this.score > hs) this.registry.set(REG.HIGH_SCORE, this.score);
