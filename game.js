@@ -776,6 +776,52 @@ PlayScene.prototype.spawnPipePair = function () {
   }
 };
 
+PlayScene.prototype.collectCoin = function (sensor, coin) {
+  if (!coin || !coin.active) return;
+
+  if (coin._bobTween) {
+    coin._bobTween.stop();
+    coin._bobTween = null;
+  }
+
+  coin.destroy();
+
+  this.coinCount = (this.coinCount || 0) + 1;
+  this.registry.set(REG.COINS, this.coinCount);
+  saveCoins(this.coinCount);
+
+  if (this.coinText) {
+    this.coinText.setText(`Coins: ${this.coinCount}`);
+  }
+};
+
+PlayScene.prototype.applyEraVisuals = function () {
+  const { width, height } = this.scale;
+  const era = ERAS[this.eraIndex];
+
+  if (this.bg) {
+    this.bg.destroy();
+  }
+
+  this.bg = this.add.image(width / 2, height / 2, era.bgKey);
+
+  const scaleX = width / this.bg.width;
+  const scaleY = height / this.bg.height;
+  const scale = Math.max(scaleX, scaleY);
+
+  this.bg.setScale(scale);
+  this.bg.setDepth(-10);
+
+  if (this.eraText) {
+    this.eraText.setText(era.name);
+  }
+};
+
+PlayScene.prototype.switchEra = function () {
+  this.eraIndex = (this.eraIndex + 1) % ERAS.length;
+  this.applyEraVisuals();
+};
+
 PlayScene.prototype.triggerGameOver = function () {
   if (this.isGameOver) return;
   this.isGameOver = true;
@@ -791,6 +837,36 @@ PlayScene.prototype.triggerGameOver = function () {
   });
 };
 
+PlayScene.prototype.applyEraVisuals = function () {
+  const { width, height } = this.scale;
+  const era = ERAS[this.eraIndex];
+
+  if (this.bg) {
+    this.bg.destroy();
+  }
+
+  this.bg = this.add.image(width / 2, height / 2, era.bgKey);
+
+  const scaleX = width / this.bg.width;
+  const scaleY = height / this.bg.height;
+  const scale = Math.max(scaleX, scaleY);
+
+  this.bg.setScale(scale);
+  this.bg.setDepth(-10);
+
+  if (this.eraText) {
+    this.eraText.setText(era.name);
+  }
+};
+
+PlayScene.prototype.switchEra = function () {
+  this.eraIndex = (this.eraIndex + 1) % ERAS.length;
+  this.applyEraVisuals();
+
+if (this.eraText) {
+  this.eraText.setText(era.name);
+}
+};
 /* =========================================================
    GAME OVER SCENE
    ========================================================= */
