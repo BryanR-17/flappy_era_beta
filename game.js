@@ -499,6 +499,11 @@ PlayScene.prototype.constructor = PlayScene;
 PlayScene.prototype.create = function () {
   const { width, height } = this.scale;
 
+  this.physics.resume();
+  if (this.physics.world) {
+    this.physics.world.isPaused = false;
+  }
+
   this.isGameOver = false;
   this.hasStarted = false;
   this.score = 0;
@@ -540,6 +545,8 @@ PlayScene.prototype.create = function () {
 
   this.player = this.physics.add.sprite(110, height/2, charObj.key);
   this.player.setScale(SCALES.PLAYER);
+  this.player.setActive(true).setVisible(true);
+  this.player.enable = true;
   this.player.body.setCollideWorldBounds(true);
   this.player.body.setAllowGravity(false);
   this.player.body.setVelocity(0, 0);
@@ -1039,6 +1046,9 @@ PlayScene.prototype.switchEra = function () {
 
 PlayScene.prototype.triggerGameOver = function () {
   if (this.isGameOver) return;
+
+  if (!this.player || !this.player.body) return;
+
   this.isGameOver = true;
 
   this.cameras.main.shake(180, 0.008);
