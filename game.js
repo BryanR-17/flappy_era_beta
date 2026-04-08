@@ -1,3 +1,4 @@
+// version 2.0
 
 const GAME_W = 420;
 const GAME_H = 640;
@@ -44,6 +45,8 @@ const CHARACTER_COSTS = {
 const LS_KEYS = {
   COINS: "flappyEras_coins",
   UNLOCKED: "flappyEras_unlocked",
+  HIGH_SCORE: "flappyEras_highScore",
+  CHARACTER: "flappyEras_character",
 };
 
 function loadCoins() {
@@ -73,6 +76,39 @@ function loadUnlocked() {
 function saveUnlocked(arr) {
   try {
     localStorage.setItem(LS_KEYS.UNLOCKED, JSON.stringify(arr));
+  } catch {
+    // Ignore storage errors so gameplay can continue.
+  }
+}
+
+function loadHighScore() {
+  try {
+    const rawValue = localStorage.getItem(LS_KEYS.HIGH_SCORE);
+    const highScore = Number(rawValue || 0);
+    return Number.isFinite(highScore) && highScore >= 0 ? highScore : 0;
+  } catch {
+    return 0;
+  }
+}
+function saveHighScore(n) {
+  try {
+    localStorage.setItem(LS_KEYS.HIGH_SCORE, String(Math.max(0, Number(n) || 0)));
+  } catch {
+    // Ignore storage errors so gameplay can continue.
+  }
+}
+function loadCharacter() {
+  try {
+    const key = localStorage.getItem(LS_KEYS.CHARACTER);
+    return CHARACTERS.some(c => c.key === key) ? key : "dino";
+  } catch {
+    return "dino";
+  }
+}
+function saveCharacter(key) {
+  try {
+    const safeKey = CHARACTERS.some(c => c.key === key) ? key : "dino";
+    localStorage.setItem(LS_KEYS.CHARACTER, safeKey);
   } catch {
     // Ignore storage errors so gameplay can continue.
   }
@@ -117,6 +153,8 @@ const config = {
   type: Phaser.AUTO,
   width: GAME_W,
   height: GAME_H,
+  pixelArt: true,
+  roundPixels: true,
 
   scale: {
     mode: Phaser.Scale.FIT,
@@ -144,8 +182,8 @@ MenuScene.prototype.constructor = MenuScene;
 MenuScene.prototype.create = function () {
   const { width, height } = this.scale;
 
-  if (!this.registry.has(REG.CHARACTER)) this.registry.set(REG.CHARACTER, "dino");
-  if (!this.registry.has(REG.HIGH_SCORE)) this.registry.set(REG.HIGH_SCORE, 0);
+  if (!this.registry.has(REG.CHARACTER)) this.registry.set(REG.CHARACTER, loadCharacter());
+  if (!this.registry.has(REG.HIGH_SCORE)) this.registry.set(REG.HIGH_SCORE, loadHighScore());
   if (!this.registry.has(REG.COINS)) this.registry.set(REG.COINS, loadCoins());
   if (!this.registry.has(REG.UNLOCKED)) this.registry.set(REG.UNLOCKED, loadUnlocked());
 
@@ -257,6 +295,7 @@ CharacterSelectScene.prototype.create = function () {
       selectedKey = c.key;
       selectedObj = c;
       this.registry.set(REG.CHARACTER, selectedKey);
+      saveCharacter(selectedKey);
 
       preview.setTexture(c.key);
       nameText.setText(c.name);
@@ -397,6 +436,7 @@ ShopScene.prototype.create = function () {
 
       if (owned) {
         this.registry.set(REG.CHARACTER, c.key);
+        saveCharacter(c.key);
         preview.setTexture(c.key);
         fitPreview();
         previewName.setText(c.name);
@@ -410,7 +450,7 @@ ShopScene.prototype.create = function () {
       }
 
       coins -= cost;
-      unlocked = [...unlocked, c.key];
+      if (!unlocked.includes(c.key)) unlocked = [...unlocked, c.key];
 
       this.registry.set(REG.COINS, coins);
       this.registry.set(REG.UNLOCKED, unlocked);
@@ -471,7 +511,7 @@ PlayScene.prototype.create = function () {
   this.minPipeGap = 150;
   this.basePipeSpawnDelay = 1500;
   this.minPipeSpawnDelay = 1200;
-  this.firstPipeDelay = 1100;
+  this.firstPipeDelay = 1400;
   this.jumpVelocity = -305;
   this.fallJumpVelocity = -335;
 
@@ -479,6 +519,9 @@ PlayScene.prototype.create = function () {
   this.pipeGap = this.basePipeGap;
   this.pipeSpawnDelay = this.basePipeSpawnDelay;
   this.pipeTimer = null;
+  this.gameOverTimer = null;
+  this.lastFlapTime = 0;
+  this.flapCooldown = 120;
 
   this.eraIndex = 0;
   this.applyEraVisuals();
@@ -523,7 +566,6 @@ PlayScene.prototype.create = function () {
   this.scoreLabel = this.add.text(width/2, 23, "SCORE", {
     fontFamily: "Arial Black", fontSize: "14px", color: "#d9f7ff"
   }).setOrigin(0.5);
-
 
   this.scoreText = this.add.text(width/2, 40, "0", {
     fontFamily: "Arial Black", fontSize: "40px", color: "#ffffff",
@@ -607,6 +649,11 @@ PlayScene.prototype.create = function () {
     this.input.off("pointerdown", this.handlePointerDown);
     this.input.keyboard.off("keydown", this.handleKeyDown);
 
+    if (this.gameOverTimer) {
+      this.gameOverTimer.remove();
+      this.gameOverTimer = null;
+    }
+
     if (this.pipeTimer) {
       this.pipeTimer.remove();
       this.pipeTimer = null;
@@ -625,6 +672,27 @@ PlayScene.prototype.create = function () {
     if (this.flapParticles) {
       this.flapParticles.destroy();
       this.flapParticles = null;
+    }
+
+    this.pipes.getChildren().forEach(pipe => {
+      if (pipe.visual) {
+        pipe.visual.destroy();
+        pipe.visual = null;
+      }
+    });
+    this.pipes.clear(true, true);
+
+    this.coins.getChildren().forEach(coin => {
+      if (coin._bobTween) {
+        coin._bobTween.stop();
+        coin._bobTween = null;
+      }
+    });
+    this.coins.clear(true, true);
+
+    if (this.coinSensor) {
+      this.coinSensor.destroy();
+      this.coinSensor = null;
     }
 
     this.handlePointerDown = null;
@@ -655,6 +723,11 @@ PlayScene.prototype.update = function () {
   const vy = this.player.body.velocity.y;
   this.player.rotation = Phaser.Math.Clamp(vy / 700, -0.5, 0.85);
 
+  if (this.player.y < this.player.displayHeight * 0.15) {
+    this.triggerGameOver();
+    return;
+  }
+
   this.pipes.getChildren().forEach(pipe => {
     if (pipe.visual) pipe.visual.x = pipe.x;
 
@@ -680,15 +753,19 @@ PlayScene.prototype.update = function () {
 PlayScene.prototype.handleFlapInput = function () {
   if (this.isGameOver) return;
 
+  const now = this.time.now;
+  if (now - this.lastFlapTime < this.flapCooldown) return;
+  this.lastFlapTime = now;
+
   if (!this.hasStarted) this.startRun();
 
   const currentVelocity = this.player.body.velocity.y;
   let nextVelocity = this.jumpVelocity;
 
-  if (currentVelocity > 140) {
+  if (currentVelocity > 150) {
     nextVelocity = this.fallJumpVelocity;
-  } else if (currentVelocity < -180) {
-    nextVelocity = -285;
+  } else if (currentVelocity < -200) {
+    nextVelocity = -280;
   }
 
   this.player.body.setVelocityY(nextVelocity);
@@ -787,12 +864,12 @@ PlayScene.prototype.scheduleNextPipe = function (delay) {
 };
 
 PlayScene.prototype.refreshDifficulty = function () {
-  const rampProgress = Phaser.Math.Clamp((this.score - 5) / 30, 0, 1);
-  const easedProgress = 1 - Math.pow(1 - rampProgress, 1.35);
+  const t = Phaser.Math.Clamp(this.score / 40, 0, 1);
+  const smooth = t * t * (3 - 2 * t);
 
-  this.pipeSpeed = Math.round(Phaser.Math.Linear(this.basePipeSpeed, this.maxPipeSpeed, easedProgress));
-  this.pipeGap = Math.round(Phaser.Math.Linear(this.basePipeGap, this.minPipeGap, easedProgress));
-  this.pipeSpawnDelay = Math.round(Phaser.Math.Linear(this.basePipeSpawnDelay, this.minPipeSpawnDelay, easedProgress));
+  this.pipeSpeed = Math.round(Phaser.Math.Linear(this.basePipeSpeed, this.maxPipeSpeed, smooth));
+  this.pipeGap = Math.round(Phaser.Math.Linear(this.basePipeGap, this.minPipeGap, smooth));
+  this.pipeSpawnDelay = Math.round(Phaser.Math.Linear(this.basePipeSpawnDelay, this.minPipeSpawnDelay, smooth));
 
   this.pipes.getChildren().forEach(pipe => {
     if (pipe.body) pipe.body.setVelocityX(-this.pipeSpeed);
@@ -832,12 +909,14 @@ PlayScene.prototype.spawnPipePair = function () {
     .setOrigin(0.5)
     .setAlpha(0);
   topBody.body.setVelocityX(-this.pipeSpeed);
+  topBody.body.setSize(PIPE_W * 0.9, topH, true);
 
   const bottomBody = this.pipes.create(width + 60, botY + botH / 2, "pipeBodyTex")
     .setDisplaySize(PIPE_W, botH)
     .setOrigin(0.5)
     .setAlpha(0);
   bottomBody.body.setVelocityX(-this.pipeSpeed);
+  bottomBody.body.setSize(PIPE_W * 0.9, botH, true);
 
   const topVisual = buildVoxelPipe(this, eraKey, VISUAL_W, topH, true);
   topVisual.x = topBody.x;
@@ -964,17 +1043,33 @@ PlayScene.prototype.triggerGameOver = function () {
 
   this.cameras.main.shake(180, 0.008);
   this.physics.pause();
-  if (this.pipeTimer) this.pipeTimer.remove();
+
+  if (this.pipeTimer) {
+    this.pipeTimer.remove();
+    this.pipeTimer = null;
+  }
+
   if (this.flapParticles) this.flapParticles.stop();
+
+  this.coins.getChildren().forEach(coin => {
+    if (coin._bobTween) {
+      coin._bobTween.stop();
+      coin._bobTween = null;
+    }
+  });
 
   this.savedCoins += this.runCoins;
   this.registry.set(REG.COINS, this.savedCoins);
   saveCoins(this.savedCoins);
 
-  const hs = this.registry.get(REG.HIGH_SCORE);
-  if (this.score > hs) this.registry.set(REG.HIGH_SCORE, this.score);
+  const hs = this.registry.get(REG.HIGH_SCORE) || 0;
+  if (this.score > hs) {
+    this.registry.set(REG.HIGH_SCORE, this.score);
+    saveHighScore(this.score);
+  }
 
-  this.time.delayedCall(600, () => {
+  this.gameOverTimer = this.time.delayedCall(600, () => {
+    this.gameOverTimer = null;
     this.scene.start("GameOverScene", { score: this.score });
   });
 };
@@ -1053,6 +1148,19 @@ function makeButton(scene, x, y, w, h, color, label, opts = {}) {
     btnBg.on("pointerover", () => btnBg.setScale(hoverScale));
     btnBg.on("pointerout", () => btnBg.setScale(1));
   }
+
+  btnBg.on("pointerdown", () => {
+    scene.tweens.killTweensOf(btnBg);
+    btnBg.setScale(hoverScale === 1.0 ? 0.98 : hoverScale * 0.97);
+  });
+
+  btnBg.on("pointerup", () => {
+    btnBg.setScale(1);
+  });
+
+  btnBg.on("pointerout", () => {
+    btnBg.setScale(1);
+  });
 
   btnBg.text = btnText;
   return btnBg;
