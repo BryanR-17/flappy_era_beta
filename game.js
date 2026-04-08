@@ -1,13 +1,3 @@
-/* =========================================================
-   FLAPPY ERAS — CLEAN MVP (Phaser 3) w/ REAL SPRITES
-   + COINS (coin.png) + REAL SHOP SCREEN (buy/unlock characters)
-
-   ✅ THIS UPDATE:
-   - REMOVED moving clouds
-   - SHOP: no REFRESH button (only BACK)
-   - SHOP: characters a bit smaller (preview + card icons)
-   - Coins: collect when ANY part of character touches coin (sensor)
-   ========================================================= */
 
 const GAME_W = 420;
 const GAME_H = 640;
@@ -57,10 +47,20 @@ const LS_KEYS = {
 };
 
 function loadCoins() {
-  return Number(localStorage.getItem(LS_KEYS.COINS) || 0);
+  try {
+    const rawValue = localStorage.getItem(LS_KEYS.COINS);
+    const coins = Number(rawValue || 0);
+    return Number.isFinite(coins) && coins >= 0 ? coins : 0;
+  } catch {
+    return 0;
+  }
 }
 function saveCoins(n) {
-  localStorage.setItem(LS_KEYS.COINS, String(n));
+  try {
+    localStorage.setItem(LS_KEYS.COINS, String(Math.max(0, Number(n) || 0)));
+  } catch {
+    // Ignore storage errors so gameplay can continue.
+  }
 }
 function loadUnlocked() {
   try {
@@ -71,7 +71,11 @@ function loadUnlocked() {
   }
 }
 function saveUnlocked(arr) {
-  localStorage.setItem(LS_KEYS.UNLOCKED, JSON.stringify(arr));
+  try {
+    localStorage.setItem(LS_KEYS.UNLOCKED, JSON.stringify(arr));
+  } catch {
+    // Ignore storage errors so gameplay can continue.
+  }
 }
 
 // Eras
@@ -326,6 +330,11 @@ ShopScene.prototype.create = function () {
   const cardW = 118;
   const cardH = 100;
   const gridTop = 395;
+  const cardRefreshers = [];
+
+  const refreshCards = () => {
+    cardRefreshers.forEach(updateCard => updateCard());
+  };
 
   const renderCard = (c, idx) => {
     const col = idx % cols;
@@ -410,7 +419,7 @@ ShopScene.prototype.create = function () {
 
       msg.setText(`Unlocked ${c.name}!`);
       refreshHud();
-      updateCard();
+      refreshCards();
     });
 
     const previewThis = () => {
@@ -427,7 +436,9 @@ ShopScene.prototype.create = function () {
     return updateCard;
   };
 
-  CHARACTERS.forEach((c, i) => renderCard(c, i));
+  CHARACTERS.forEach((c, i) => {
+    cardRefreshers.push(renderCard(c, i));
+  });
 
   // ONLY BACK button
   const backBtn = makeButton(this, width/2, 623, 170, 34, 0x666677, "BACK", {
@@ -523,8 +534,7 @@ PlayScene.prototype.create = function () {
     fontFamily: "Arial Black", fontSize: "16px", color: "#ffffff"
   }).setOrigin(0.5).setAlpha(0.8);
 
-  this.coinCount = this.registry.get(REG.COINS) || 0;
-  this.runCoinText = this.add.text(14, 14, `Coins: ${this.coinCount}`, {
+  this.runCoinText = this.add.text(14, 14, "Run Coins: 0", {
     fontFamily: "Arial Black", fontSize: "18px", color: "#ffd66b",
     stroke: "#000000", strokeThickness: 4
   }).setOrigin(0, 0);
@@ -580,14 +590,45 @@ PlayScene.prototype.create = function () {
     ease: "Sine.easeInOut"
   });
 
-  this.input.on("pointerdown", () => {
+  this.handlePointerDown = () => {
     this.handleFlapInput();
-  });
+  };
 
-  this.input.keyboard.on("keydown", (e) => {
+  this.handleKeyDown = (e) => {
     if (e.code === "Space" || e.code === "ArrowUp") {
       this.handleFlapInput();
     }
+  };
+
+  this.input.on("pointerdown", this.handlePointerDown);
+  this.input.keyboard.on("keydown", this.handleKeyDown);
+
+  this.events.once("shutdown", () => {
+    this.input.off("pointerdown", this.handlePointerDown);
+    this.input.keyboard.off("keydown", this.handleKeyDown);
+
+    if (this.pipeTimer) {
+      this.pipeTimer.remove();
+      this.pipeTimer = null;
+    }
+
+    if (this.idleFloatTween) {
+      this.idleFloatTween.stop();
+      this.idleFloatTween = null;
+    }
+
+    if (this.startPromptTween) {
+      this.startPromptTween.stop();
+      this.startPromptTween = null;
+    }
+
+    if (this.flapParticles) {
+      this.flapParticles.destroy();
+      this.flapParticles = null;
+    }
+
+    this.handlePointerDown = null;
+    this.handleKeyDown = null;
   });
 
   this.physics.add.overlap(this.player, this.pipes, () => this.triggerGameOver(), null, this);
