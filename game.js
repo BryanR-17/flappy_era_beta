@@ -470,8 +470,7 @@ PlayScene.prototype.create = function () {
   this.hasStarted = false;
   this.score = 0;
   this.runCoins = 0;
-  const registryCoins = this.registry.get(REG.COINS);
-  this.savedCoins = Number.isFinite(registryCoins) ? registryCoins : loadCoins();
+  this.savedCoins = this.registry.get(REG.COINS) || loadCoins();
 
   this.basePipeSpeed = 185;
   this.maxPipeSpeed = 255;
@@ -479,7 +478,7 @@ PlayScene.prototype.create = function () {
   this.minPipeGap = 150;
   this.basePipeSpawnDelay = 1500;
   this.minPipeSpawnDelay = 1200;
-  this.firstPipeDelay = 1100;
+  this.firstPipeDelay = 1400;
   this.jumpVelocity = -305;
   this.fallJumpVelocity = -335;
 
@@ -487,11 +486,13 @@ PlayScene.prototype.create = function () {
   this.pipeGap = this.basePipeGap;
   this.pipeSpawnDelay = this.basePipeSpawnDelay;
   this.pipeTimer = null;
+  this.gameOverTimer = null;
+  this.lastFlapTime = 0;
+  this.flapCooldown = 120;
 
   this.eraIndex = 0;
   this.applyEraVisuals();
 
-  // Pipe body texture for invisible collision boxes
   if (!this.textures.exists("pipeBodyTex")) {
     const g = this.make.graphics({ x: 0, y: 0, add: false });
     g.fillStyle(0xffffff, 1);
@@ -505,6 +506,8 @@ PlayScene.prototype.create = function () {
 
   this.player = this.physics.add.sprite(110, height/2, charObj.key);
   this.player.setScale(SCALES.PLAYER);
+  this.player.setActive(true).setVisible(true);
+  this.player.body.enable = true;
   this.player.body.setCollideWorldBounds(true);
   this.player.body.setAllowGravity(false);
   this.player.body.setVelocity(0, 0);
