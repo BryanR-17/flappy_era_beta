@@ -3,10 +3,10 @@ const GAME_H = 640;
 
 // --- Easy scale tuning
 const SCALES = {
-  MENU_PREVIEW: 0.23,
+  MENU_PREVIEW: 0.21,
   SELECT_PREVIEW: 0.20,
   SELECT_ICON: 0.05,
-  PLAYER: 0.15,
+  PLAYER: 0.13,
   HITBOX: 0.70
 };
 
