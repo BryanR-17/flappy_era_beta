@@ -13,6 +13,14 @@ const SCALES = {
 // Thicker voxel pipes
 const PILLAR_WIDTH_MULT = 1.9;
 
+// Asset folders
+const ASSET_PATHS = {
+  COIN: "assets/coin.png",
+  CHARACTERS: "assets/characters",
+  ERAS: "assets/eras",
+  PIPES: "assets/pipes"
+};
+
 // Registry keys
 const REG = {
   CHARACTER: "character",
@@ -23,11 +31,11 @@ const REG = {
 
 // Characters
 const CHARACTERS = [
-  { key: "dino",  name: "Dino",  file: "small_dino_101.png" },
-  { key: "bird",  name: "Bird",  file: "small_duck_101.png" },
-  { key: "robot", name: "Robot", file: "small_cyborg_101.png" },
-  { key: "cat",   name: "Cat",   file: "small_cat_101.png" },
-  { key: "alien", name: "Alien", file: "small_alien_101.png" },
+  { key: "dino",  name: "Dino",  file: `${ASSET_PATHS.CHARACTERS}/small_dino_101.png` },
+  { key: "bird",  name: "Bird",  file: `${ASSET_PATHS.CHARACTERS}/small_duck_101.png` },
+  { key: "robot", name: "Robot", file: `${ASSET_PATHS.CHARACTERS}/small_cyborg_101.png` },
+  { key: "cat",   name: "Cat",   file: `${ASSET_PATHS.CHARACTERS}/small_cat_101.png` },
+  { key: "alien", name: "Alien", file: `${ASSET_PATHS.CHARACTERS}/small_alien_101.png` },
 ];
 
 // Shop prices
@@ -87,10 +95,10 @@ function saveUnlocked(arr) {
 
 // Eras
 const ERAS = [
-  { key: "prehistoric", name: "Prehistoric", bgKey: "bg_prehistoric", bgFile: "prehistoric_voxel.png" },
-  { key: "medieval",    name: "Medieval",    bgKey: "bg_medieval",    bgFile: "medieval_voxel.png" },
-  { key: "cyberpunk",   name: "Cyberpunk",   bgKey: "bg_cyberpunk",   bgFile: "cyberpunk_voxel.png" },
-  { key: "space",       name: "Space",       bgKey: "bg_space",       bgFile: "space_voxel.png" }
+  { key: "prehistoric", name: "Prehistoric", bgKey: "bg_prehistoric", bgFile: `${ASSET_PATHS.ERAS}/prehistoric_voxel.png` },
+  { key: "medieval",    name: "Medieval",    bgKey: "bg_medieval",    bgFile: `${ASSET_PATHS.ERAS}/medieval_voxel.png` },
+  { key: "cyberpunk",   name: "Cyberpunk",   bgKey: "bg_cyberpunk",   bgFile: `${ASSET_PATHS.ERAS}/cyberpunk_voxel.png` },
+  { key: "space",       name: "Space",       bgKey: "bg_space",       bgFile: `${ASSET_PATHS.ERAS}/space_voxel.png` }
 ];
 
 /* =========================================================
@@ -105,12 +113,12 @@ BootScene.prototype.preload = function () {
   ERAS.forEach(e => this.load.image(e.bgKey, e.bgFile));
 
   ERAS.forEach(e => {
-    this.load.image(`${e.key}_pillar_top`,    `${e.key}_pillar_top.png`);
-    this.load.image(`${e.key}_pillar_mid`,    `${e.key}_pillar_mid.png`);
-    this.load.image(`${e.key}_pillar_bottom`, `${e.key}_pillar_bottom.png`);
+    this.load.image(`${e.key}_pillar_top`,    `${ASSET_PATHS.PIPES}/${e.key}_pillar_top.png`);
+    this.load.image(`${e.key}_pillar_mid`,    `${ASSET_PATHS.PIPES}/${e.key}_pillar_mid.png`);
+    this.load.image(`${e.key}_pillar_bottom`, `${ASSET_PATHS.PIPES}/${e.key}_pillar_bottom.png`);
   });
 
-  this.load.image("coin", "coin.png");
+  this.load.image("coin", ASSET_PATHS.COIN);
 };
 
 BootScene.prototype.create = function () {
@@ -468,9 +476,14 @@ PlayScene.prototype.create = function () {
 
   this.isGameOver = false;
   this.hasStarted = false;
+  this.didCleanup = false;
   this.score = 0;
   this.runCoins = 0;
-  this.savedCoins = this.registry.get(REG.COINS) || loadCoins();
+  const registryCoins = this.registry.get(REG.COINS);
+  this.savedCoins = Number.isFinite(registryCoins) ? registryCoins : loadCoins();
+
+  this.physics.resume();
+  this.cameras.main.resetFX();
 
   this.basePipeSpeed = 185;
   this.maxPipeSpeed = 255;
@@ -616,6 +629,9 @@ PlayScene.prototype.create = function () {
   }
 
   const cleanupScene = () => {
+    if (this.didCleanup) return;
+    this.didCleanup = true;
+
     this.input.off("pointerdown", this.handlePointerDown);
     if (this.input.keyboard) {
       this.input.keyboard.off("keydown", this.handleKeyDown);
@@ -641,11 +657,53 @@ PlayScene.prototype.create = function () {
       this.flapParticles = null;
     }
 
+    if (this.coins) {
+      this.coins.getChildren().forEach(coin => {
+        if (coin._bobTween) {
+          coin._bobTween.stop();
+          coin._bobTween = null;
+        }
+      });
+      this.coins.clear(true, true);
+    }
+
+    if (this.pipes) {
+      this.pipes.getChildren().forEach(pipe => {
+        if (pipe.visual) {
+          pipe.visual.destroy();
+          pipe.visual = null;
+        }
+      });
+      this.pipes.clear(true, true);
+    }
+
+    if (this.coinSensor) {
+      this.coinSensor.destroy();
+      this.coinSensor = null;
+    }
+
+    if (this.player) {
+      this.player.destroy();
+      this.player = null;
+    }
+
+    if (this.ground) {
+      this.ground.destroy();
+      this.ground = null;
+    }
+
+    if (this.bg) {
+      this.bg.destroy();
+      this.bg = null;
+    }
+
+    this.tweens.killAll();
     this.handlePointerDown = null;
     this.handleKeyDown = null;
   };
 
   this.events.once("shutdown", cleanupScene);
+  this.events.once("destroy", cleanupScene);
 
   this.physics.add.overlap(this.player, this.pipes, () => this.triggerGameOver(), null, this);
   this.physics.add.overlap(this.coinSensor, this.coins, this.collectCoin, null, this);
@@ -980,8 +1038,22 @@ PlayScene.prototype.triggerGameOver = function () {
 
   this.cameras.main.shake(180, 0.008);
   this.physics.pause();
-  if (this.pipeTimer) this.pipeTimer.remove();
+  if (this.pipeTimer) {
+    this.pipeTimer.remove();
+    this.pipeTimer = null;
+  }
+  if (this.gameOverTimer) {
+    this.gameOverTimer.remove();
+    this.gameOverTimer = null;
+  }
   if (this.flapParticles) this.flapParticles.stop();
+
+  this.coins.getChildren().forEach(coin => {
+    if (coin._bobTween) {
+      coin._bobTween.stop();
+      coin._bobTween = null;
+    }
+  });
 
   this.savedCoins += this.runCoins;
   this.registry.set(REG.COINS, this.savedCoins);
@@ -990,7 +1062,8 @@ PlayScene.prototype.triggerGameOver = function () {
   const hs = this.registry.get(REG.HIGH_SCORE);
   if (this.score > hs) this.registry.set(REG.HIGH_SCORE, this.score);
 
-  this.time.delayedCall(600, () => {
+  this.gameOverTimer = this.time.delayedCall(600, () => {
+    this.gameOverTimer = null;
     this.scene.start("GameOverScene", { score: this.score });
   });
 };
