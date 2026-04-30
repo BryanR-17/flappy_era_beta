@@ -530,15 +530,16 @@ PlayScene.prototype.resetRunState = function () {
   const registryCoins = this.registry.get(REG.COINS);
   this.savedCoins = Number.isFinite(registryCoins) ? registryCoins : loadCoins();
 
-  this.basePipeSpeed = 185;
-  this.maxPipeSpeed = 255;
-  this.basePipeGap = 200;
-  this.minPipeGap = 150;
-  this.basePipeSpawnDelay = 1500;
-  this.minPipeSpawnDelay = 1200;
-  this.firstPipeDelay = 1400;
-  this.jumpVelocity = -305;
-  this.fallJumpVelocity = -335;
+  this.basePipeSpeed = 175;
+  this.maxPipeSpeed = 265;
+  this.basePipeGap = 210;
+  this.minPipeGap = 145;
+  this.basePipeSpawnDelay = 1550;
+  this.minPipeSpawnDelay = 1125;
+  this.firstPipeDelay = 1650;
+  this.jumpVelocity = -315;
+  this.fallJumpVelocity = -350;
+  this.lastPipeCenterY = null;
 
   this.pipeSpeed = this.basePipeSpeed;
   this.pipeGap = this.basePipeGap;
@@ -547,7 +548,7 @@ PlayScene.prototype.resetRunState = function () {
   this.gameOverTimer = null;
   this.startPromptFadeTween = null;
   this.lastFlapTime = 0;
-  this.flapCooldown = 120;
+  this.flapCooldown = 95;
 
   // Reset scene object references from the previous PlayScene run.
   // Phaser reuses the scene object, so old destroyed objects can still be stored here.
@@ -978,8 +979,8 @@ PlayScene.prototype.scheduleNextPipe = function (delay) {
 };
 
 PlayScene.prototype.refreshDifficulty = function () {
-  const rampProgress = Phaser.Math.Clamp((this.score - 5) / 30, 0, 1);
-  const easedProgress = 1 - Math.pow(1 - rampProgress, 1.35);
+  const rampProgress = Phaser.Math.Clamp((this.score - 8) / 45, 0, 1);
+  const easedProgress = rampProgress * rampProgress * (3 - 2 * rampProgress);
 
   this.pipeSpeed = Math.round(Phaser.Math.Linear(this.basePipeSpeed, this.maxPipeSpeed, easedProgress));
   this.pipeGap = Math.round(Phaser.Math.Linear(this.basePipeGap, this.minPipeGap, easedProgress));
@@ -998,7 +999,6 @@ PlayScene.prototype.refreshDifficulty = function () {
   });
 };
 
-
 PlayScene.prototype.incrementScore = function () {
   this.score++;
   this.scoreText.setText(this.score);
@@ -1015,7 +1015,21 @@ PlayScene.prototype.spawnPipePair = function () {
   const eraKey = era.key;
 
   const halfGap = this.pipeGap / 2;
-  const centerY = Phaser.Math.Between(130 + halfGap, height - 140 - halfGap);
+  const minCenterY = 120 + halfGap;
+  const maxCenterY = height - 150 - halfGap;
+  let centerY = Phaser.Math.Between(minCenterY, maxCenterY);
+
+  if (this.lastPipeCenterY !== null) {
+    const maxCenterChange = 115;
+    centerY = Phaser.Math.Clamp(
+      centerY,
+      this.lastPipeCenterY - maxCenterChange,
+      this.lastPipeCenterY + maxCenterChange
+    );
+  }
+
+  centerY = Phaser.Math.Clamp(centerY, minCenterY, maxCenterY);
+  this.lastPipeCenterY = centerY;
 
   const topH = Math.max(centerY - halfGap, 20);
   const botY = centerY + halfGap;
