@@ -537,6 +537,18 @@ PlayScene.prototype.create = function () {
   // Reset scene object references from the previous PlayScene run.
   // Phaser reuses the scene object, so old destroyed objects can still be stored here.
   this.bg = null;
+  this.eraText = null;
+  this.scoreText = null;
+  this.scorePanel = null;
+  this.runCoinText = null;
+  this.startPromptBg = null;
+  this.startPrompt = null;
+  this.player = null;
+  this.coinSensor = null;
+  this.pipes = null;
+  this.coins = null;
+  this.ground = null;
+  this.flapParticles = null;
 
   this.eraIndex = 0;
   this.applyEraVisuals();
@@ -698,6 +710,7 @@ PlayScene.prototype.create = function () {
 
     if (this.startPromptFadeTween) {
       this.startPromptFadeTween.stop();
+      this.startPromptFadeTween = null;
     }
 
     this.handlePointerDown = null;
@@ -1024,7 +1037,7 @@ PlayScene.prototype.applyEraVisuals = function () {
   this.bg.setScale(scale);
   this.bg.setAlpha(1);
 
-  if (this.eraText) {
+  if (this.eraText && this.eraText.scene) {
     this.eraText.setText(era.name);
     this.eraText.setScale(1);
     this.eraText.setAlpha(0.85);
