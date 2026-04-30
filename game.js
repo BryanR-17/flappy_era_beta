@@ -51,7 +51,9 @@ const CHARACTER_COSTS = {
 const LS_KEYS = {
   COINS: "flappyEras_coins",
   UNLOCKED: "flappyEras_unlocked",
+  HIGH_SCORE: "flappyEras_highScore",
 };
+
 
 function sanitizeUnlocked(list) {
   const validKeys = new Set(CHARACTERS.map(c => c.key));
@@ -77,6 +79,24 @@ function saveCoins(n) {
     // Ignore storage errors so gameplay can continue.
   }
 }
+
+function loadHighScore() {
+  try {
+    const score = Number(localStorage.getItem(LS_KEYS.HIGH_SCORE) || 0);
+    return Number.isFinite(score) && score >= 0 ? score : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function saveHighScore(n) {
+  try {
+    localStorage.setItem(LS_KEYS.HIGH_SCORE, String(Math.max(0, Number(n) || 0)));
+  } catch {
+    // Ignore storage errors so gameplay can continue.
+  }
+}
+
 function loadUnlocked() {
   try {
     const arr = JSON.parse(localStorage.getItem(LS_KEYS.UNLOCKED) || '["dino"]');
@@ -160,7 +180,7 @@ MenuScene.prototype.create = function () {
   const { width, height } = this.scale;
 
   if (!this.registry.has(REG.CHARACTER)) this.registry.set(REG.CHARACTER, "dino");
-  if (!this.registry.has(REG.HIGH_SCORE)) this.registry.set(REG.HIGH_SCORE, 0);
+  if (!this.registry.has(REG.HIGH_SCORE)) this.registry.set(REG.HIGH_SCORE, loadHighScore());
   if (!this.registry.has(REG.COINS)) this.registry.set(REG.COINS, loadCoins());
   if (!this.registry.has(REG.UNLOCKED)) this.registry.set(REG.UNLOCKED, loadUnlocked());
 
@@ -519,6 +539,7 @@ PlayScene.prototype.create = function () {
 
   this.player = this.physics.add.sprite(110, height/2, charObj.key);
   this.player.setScale(SCALES.PLAYER);
+  this.player.setScale(3);
   this.player.setActive(true).setVisible(true);
   this.player.body.enable = true;
   this.player.body.setCollideWorldBounds(true);
@@ -715,7 +736,16 @@ PlayScene.prototype.create = function () {
 };
 
 PlayScene.prototype.update = function () {
-  if (this.isGameOver) return;
+  if (
+    this.isGameOver ||
+    !this.player ||
+    !this.player.body ||
+    !this.coinSensor ||
+    !this.pipes ||
+    !this.coins
+  ) {
+    return;
+  }
 
   // keep sensor glued to player
   this.coinSensor.x = this.player.x;
@@ -752,9 +782,13 @@ PlayScene.prototype.update = function () {
 };
 
 PlayScene.prototype.handleFlapInput = function () {
-  if (this.isGameOver) return;
+  if (this.isGameOver || !this.player || !this.player.body) return;
+
+  const now = this.time.now;
+  if (this.hasStarted && now - this.lastFlapTime < this.flapCooldown) return;
 
   if (!this.hasStarted) this.startRun();
+  this.lastFlapTime = now;
 
   const currentVelocity = this.player.body.velocity.y;
   let nextVelocity = this.jumpVelocity;
@@ -772,6 +806,7 @@ PlayScene.prototype.handleFlapInput = function () {
     this.player.y -= 2;
   }
 };
+
 
 PlayScene.prototype.emitFlapParticles = function () {
   if (!this.flapParticles) return;
@@ -968,7 +1003,7 @@ PlayScene.prototype.collectCoin = function (_sensor, coin) {
     coin._bobTween = null;
   }
 
-  coin.destroy();
+  coin.disableBody(true, true );
 
   this.runCoins += 1;
 
@@ -1060,7 +1095,10 @@ PlayScene.prototype.triggerGameOver = function () {
   saveCoins(this.savedCoins);
 
   const hs = this.registry.get(REG.HIGH_SCORE);
-  if (this.score > hs) this.registry.set(REG.HIGH_SCORE, this.score);
+  if (this.score > hs) {
+    this.registry.set(REG.HIGH_SCORE, this.score);
+    saveHighScore(this.score);
+  } 
 
   this.gameOverTimer = this.time.delayedCall(600, () => {
     this.gameOverTimer = null;
