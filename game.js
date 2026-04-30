@@ -504,6 +504,24 @@ PlayScene.prototype.constructor = PlayScene;
 PlayScene.prototype.create = function () {
   const { width, height } = this.scale;
 
+  this.resetRunState();
+
+  this.physics.resume();
+  this.cameras.main.resetFX();
+
+  this.ensurePipeBodyTexture();
+  this.applyEraVisuals();
+  this.createPlayer(width, height);
+  this.createGroups();
+  this.createHud(width, height);
+  this.createStartPrompt(width, height);
+  this.createFlapParticles();
+  this.setupInputHandlers();
+  this.setupSceneCleanup();
+  this.setupCollisions(width, height);
+};
+
+PlayScene.prototype.resetRunState = function () {
   this.isGameOver = false;
   this.hasStarted = false;
   this.didCleanup = false;
@@ -511,9 +529,6 @@ PlayScene.prototype.create = function () {
   this.runCoins = 0;
   const registryCoins = this.registry.get(REG.COINS);
   this.savedCoins = Number.isFinite(registryCoins) ? registryCoins : loadCoins();
-
-  this.physics.resume();
-  this.cameras.main.resetFX();
 
   this.basePipeSpeed = 185;
   this.maxPipeSpeed = 255;
@@ -539,8 +554,10 @@ PlayScene.prototype.create = function () {
   this.bg = null;
   this.eraText = null;
   this.scoreText = null;
+  this.scoreLabel = null;
   this.scorePanel = null;
   this.runCoinText = null;
+  this.eraFlash = null;
   this.startPromptBg = null;
   this.startPrompt = null;
   this.player = null;
@@ -551,8 +568,9 @@ PlayScene.prototype.create = function () {
   this.flapParticles = null;
 
   this.eraIndex = 0;
-  this.applyEraVisuals();
+};
 
+PlayScene.prototype.ensurePipeBodyTexture = function () {
   if (!this.textures.exists("pipeBodyTex")) {
     const g = this.make.graphics({ x: 0, y: 0, add: false });
     g.fillStyle(0xffffff, 1);
@@ -560,7 +578,9 @@ PlayScene.prototype.create = function () {
     g.generateTexture("pipeBodyTex", 1, 1);
     g.destroy();
   }
+};
 
+PlayScene.prototype.createPlayer = function (_width, height) {
   const selectedKey = this.registry.get(REG.CHARACTER) || "dino";
   const charObj = CHARACTERS.find(c => c.key === selectedKey) || CHARACTERS[0];
 
@@ -585,10 +605,14 @@ PlayScene.prototype.create = function () {
   this.coinSensor.body.setAllowGravity(false);
   this.coinSensor.body.setImmovable(true);
   this.coinSensor.body.setSize(this.player.displayWidth, this.player.displayHeight, true);
+};
 
+PlayScene.prototype.createGroups = function () {
   this.pipes = this.physics.add.group({ allowGravity: false, immovable: true });
   this.coins = this.physics.add.group({ allowGravity: false, immovable: true });
+};
 
+PlayScene.prototype.createHud = function (width, height) {
   this.scorePanel = this.add.rectangle(width/2, 42, 150, 72, 0x000000, 0.32)
     .setStrokeStyle(2, 0xffffff, 0.25);
 
@@ -616,6 +640,13 @@ PlayScene.prototype.create = function () {
   this.eraText.setDepth(4);
   this.runCoinText.setDepth(4);
 
+  // Reused for era switches so we get a transition without destroying old images.
+  this.eraFlash = this.add.rectangle(width/2, height/2, width, height, 0xffffff, 0)
+    .setDepth(6)
+    .setVisible(false);
+};
+
+PlayScene.prototype.createStartPrompt = function (width, height) {
   this.startPromptBg = this.add.rectangle(width/2, height - 120, 280, 80, 0x000000, 0.42)
     .setStrokeStyle(2, 0xffffff, 0.35);
 
@@ -630,7 +661,9 @@ PlayScene.prototype.create = function () {
 
   this.startPromptBg.setDepth(4);
   this.startPrompt.setDepth(5);
+};
 
+PlayScene.prototype.createFlapParticles = function () {
   // Small burst used each time the bird flaps.
   this.flapParticles = this.add.particles(0, 0, "pipeBodyTex", {
     scale: { start: 5, end: 0 },
@@ -642,7 +675,9 @@ PlayScene.prototype.create = function () {
     emitting: false
   });
   this.flapParticles.setDepth(1);
+};
 
+PlayScene.prototype.setupInputHandlers = function () {
   this.idleFloatTween = this.tweens.add({
     targets: this.player,
     y: this.player.y + 12,
@@ -675,7 +710,9 @@ PlayScene.prototype.create = function () {
   if (this.input.keyboard) {
     this.input.keyboard.on("keydown", this.handleKeyDown);
   }
+};
 
+PlayScene.prototype.setupSceneCleanup = function () {
   const cleanupScene = () => {
     if (this.didCleanup) return;
     this.didCleanup = true;
@@ -713,13 +750,27 @@ PlayScene.prototype.create = function () {
       this.startPromptFadeTween = null;
     }
 
+    if (this.eraFlash) {
+      this.tweens.killTweensOf(this.eraFlash);
+    }
+
+    if (this.scoreText) {
+      this.tweens.killTweensOf(this.scoreText);
+    }
+
+    if (this.scorePanel) {
+      this.tweens.killTweensOf(this.scorePanel);
+    }
+
     this.handlePointerDown = null;
     this.handleKeyDown = null;
   };
 
   this.events.once("shutdown", cleanupScene);
   this.events.once("destroy", cleanupScene);
+};
 
+PlayScene.prototype.setupCollisions = function (width, height) {
   this.physics.add.overlap(this.player, this.pipes, () => this.triggerGameOver(), null, this);
   this.physics.add.overlap(this.coinSensor, this.coins, this.collectCoin, null, this);
 
@@ -754,6 +805,8 @@ PlayScene.prototype.update = function () {
   this.player.rotation = Phaser.Math.Clamp(vy / 700, -0.5, 0.85);
 
   getGroupChildrenSafe(this.pipes).forEach(pipe => {
+    if (!pipe.active) return;
+
     if (pipe.visual) pipe.visual.x = pipe.x;
 
     if (pipe.isTop && !pipe.scored && pipe.x + pipe.displayWidth < this.player.x) {
@@ -762,17 +815,47 @@ PlayScene.prototype.update = function () {
     }
 
     if (pipe.x < -100) {
-      if (pipe.visual) pipe.visual.destroy();
-      pipe.destroy();
+      this.removePipe(pipe);
     }
   });
 
   getGroupChildrenSafe(this.coins).forEach(c => {
+    if (!c.active) return;
+
     if (c.x < -120) {
-      if (c._bobTween) c._bobTween.stop();
-      c.destroy();
+      this.removeCoin(c);
     }
   });
+};
+
+PlayScene.prototype.removePipe = function (pipe) {
+  if (!pipe || !pipe.active) return;
+
+  if (pipe.visual) {
+    pipe.visual.destroy();
+    pipe.visual = null;
+  }
+
+  if (pipe.disableBody) {
+    pipe.disableBody(true, true);
+  } else {
+    pipe.destroy();
+  }
+};
+
+PlayScene.prototype.removeCoin = function (coin) {
+  if (!coin || !coin.active) return;
+
+  if (coin._bobTween) {
+    coin._bobTween.stop();
+    coin._bobTween = null;
+  }
+
+  if (coin.disableBody) {
+    coin.disableBody(true, true);
+  } else {
+    coin.destroy();
+  }
 };
 
 PlayScene.prototype.handleFlapInput = function () {
@@ -1047,6 +1130,31 @@ PlayScene.prototype.applyEraVisuals = function () {
 PlayScene.prototype.switchEra = function () {
   this.eraIndex = (this.eraIndex + 1) % ERAS.length;
   this.applyEraVisuals();
+  this.playEraTransition();
+};
+
+PlayScene.prototype.playEraTransition = function () {
+  if (!this.eraFlash || !this.eraFlash.scene) return;
+
+  this.tweens.killTweensOf(this.eraFlash);
+
+  this.eraFlash
+    .setVisible(true)
+    .setActive(true)
+    .setAlpha(0.35);
+
+  this.tweens.add({
+    targets: this.eraFlash,
+    alpha: 0,
+    duration: 260,
+    ease: "Sine.easeOut",
+    onComplete: () => {
+      if (this.eraFlash && this.eraFlash.scene) {
+        this.eraFlash.setVisible(false);
+        this.eraFlash.setActive(false);
+      }
+    }
+  });
 };
 
 PlayScene.prototype.triggerGameOver = function () {
