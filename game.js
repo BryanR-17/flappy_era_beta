@@ -1071,37 +1071,13 @@ PlayScene.prototype.triggerGameOver = function () {
   if (this.isGameOver) return;
   this.isGameOver = true;
 
-  const finishGameOver = () => {
-    this.gameOverTimer = null;
-    this.scene.start("GameOverScene", { score: this.score });
-  };
-
-  this.gameOverTimer = this.time.delayedCall(600, finishGameOver);
-
-  if (this.cameras && this.cameras.main) {
-    this.cameras.main.shake(180, 0.008);
-  }
-
-  if (this.physics) {
-    this.physics.pause();
-  }
-
+  // Stop the run first so no more pipe/coin logic keeps firing.
   if (this.pipeTimer) {
     this.pipeTimer.remove();
     this.pipeTimer = null;
   }
 
-  if (this.flapParticles) this.flapParticles.stop();
-
-  if (this.coins) {
-    this.coins.getChildren().forEach(coin => {
-      if (coin._bobTween) {
-        coin._bobTween.stop();
-        coin._bobTween = null;
-      }
-    });
-  }
-
+  // Save coins and high score before leaving the scene.
   this.savedCoins += this.runCoins;
   this.registry.set(REG.COINS, this.savedCoins);
   saveCoins(this.savedCoins);
@@ -1110,8 +1086,40 @@ PlayScene.prototype.triggerGameOver = function () {
   if (this.score > hs) {
     this.registry.set(REG.HIGH_SCORE, this.score);
     saveHighScore(this.score);
-  } 
+  }
+
+  // These effects are nice, but should never block Game Over.
+  try {
+    if (this.cameras && this.cameras.main) {
+      this.cameras.main.shake(180, 0.008);
+    }
+
+    if (this.flapParticles && this.flapParticles.stop) {
+      this.flapParticles.stop();
+    }
+
+    if (this.coins) {
+      this.coins.getChildren().forEach(coin => {
+        if (coin._bobTween) {
+          coin._bobTween.stop();
+          coin._bobTween = null;
+        }
+      });
+    }
+
+    if (this.physics) {
+      this.physics.pause();
+    }
+  } catch (error) {
+    console.warn("Game over cleanup had an issue, but continuing:", error);
+  }
+
+  // Move to Game Over after the shake moment.
+  this.time.delayedCall(600, () => {
+    this.scene.start("GameOverScene", { score: this.score });
+  });
 };
+
 
 /* =========================================================
    GAME OVER SCENE
