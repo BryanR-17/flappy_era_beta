@@ -113,6 +113,14 @@ function saveUnlocked(arr) {
   }
 }
 
+function getGroupChildrenSafe(group) {
+  if (!group || !group.children || !group.children.entries) {
+    return [];
+  }
+
+  return group.children.entries.slice();
+}
+
 // Eras
 const ERAS = [
   { key: "prehistoric", name: "Prehistoric", bgKey: "bg_prehistoric", bgFile: `${ASSET_PATHS.ERAS}/prehistoric_voxel.png` },
@@ -120,6 +128,8 @@ const ERAS = [
   { key: "cyberpunk",   name: "Cyberpunk",   bgKey: "bg_cyberpunk",   bgFile: `${ASSET_PATHS.ERAS}/cyberpunk_voxel.png` },
   { key: "space",       name: "Space",       bgKey: "bg_space",       bgFile: `${ASSET_PATHS.ERAS}/space_voxel.png` }
 ];
+
+
 
 /* =========================================================
    BOOT SCENE
@@ -520,6 +530,7 @@ PlayScene.prototype.create = function () {
   this.pipeSpawnDelay = this.basePipeSpawnDelay;
   this.pipeTimer = null;
   this.gameOverTimer = null;
+  this.startPromptFadeTween = null;
   this.lastFlapTime = 0;
   this.flapCooldown = 120;
 
@@ -653,7 +664,7 @@ PlayScene.prototype.create = function () {
     if (this.didCleanup) return;
     this.didCleanup = true;
 
-    if (this.handleFlapInput) {
+    if (this.handlePointerDown) {
       this.input.off("pointerdown", this.handlePointerDown);
     }
 
@@ -665,6 +676,11 @@ PlayScene.prototype.create = function () {
       this.pipeTimer.remove();
       this.pipeTimer = null;
     }
+
+    if (this.gameOverTimer) {
+      this.gameOverTimer.remove();
+      this.gameOverTimer = null;
+    } 
 
     if (this.idleFloatTween) {
       this.idleFloatTween.stop();
@@ -678,13 +694,11 @@ PlayScene.prototype.create = function () {
 
     if (this.startPromptFadeTween) {
       this.startPromptFadeTween.stop();
-      this.startPromptFadeTween = null; 
     }
 
     this.handlePointerDown = null;
     this.handleKeyDown = null;
   };
-
 
   this.events.once("shutdown", cleanupScene);
   this.events.once("destroy", cleanupScene);
@@ -722,7 +736,7 @@ PlayScene.prototype.update = function () {
   const vy = this.player.body.velocity.y;
   this.player.rotation = Phaser.Math.Clamp(vy / 700, -0.5, 0.85);
 
-  this.pipes.getChildren().forEach(pipe => {
+  getGroupChildrenSafe(this.pipes).forEach(pipe => {
     if (pipe.visual) pipe.visual.x = pipe.x;
 
     if (pipe.isTop && !pipe.scored && pipe.x + pipe.displayWidth < this.player.x) {
@@ -736,7 +750,7 @@ PlayScene.prototype.update = function () {
     }
   });
 
-  this.coins.getChildren().forEach(c => {
+  getGroupChildrenSafe(this.coins).forEach(c => {
     if (c.x < -120) {
       if (c._bobTween) c._bobTween.stop();
       c.destroy();
@@ -872,11 +886,11 @@ PlayScene.prototype.refreshDifficulty = function () {
   this.pipeGap = Math.round(Phaser.Math.Linear(this.basePipeGap, this.minPipeGap, easedProgress));
   this.pipeSpawnDelay = Math.round(Phaser.Math.Linear(this.basePipeSpawnDelay, this.minPipeSpawnDelay, easedProgress));
 
-  this.pipes.getChildren().forEach(pipe => {
+  getGroupChildrenSafe(this.pipes).forEach(pipe => {
     if (pipe.body) pipe.body.setVelocityX(-this.pipeSpeed);
   });
 
-  this.coins.getChildren().forEach(coin => {
+  getGroupChildrenSafe(this.coins).forEach(c => {
     if (coin.body) coin.body.setVelocityX(-this.pipeSpeed);
   });
 };
@@ -1040,13 +1054,37 @@ PlayScene.prototype.triggerGameOver = function () {
   if (this.isGameOver) return;
   this.isGameOver = true;
 
-  // Stop the run first so no more pipe/coin logic keeps firing.
   if (this.pipeTimer) {
     this.pipeTimer.remove();
     this.pipeTimer = null;
   }
 
-  // Save coins and high score before leaving the scene.
+  if (this.player && this.player.body) {
+    this.player.body.enable = false;
+    this.player.body.setVelocity(0, 0);
+  }
+
+  getGroupChildrenSafe(this.pipes).forEach(pipe => {
+    if (pipe.body) {
+      pipe.body.setVelocityX(0);
+    }
+  });
+
+  getGroupChildrenSafe(this.coins).forEach(coin => {
+    if (coin.body) {
+      coin.body.setVelocityX(0);
+    }
+
+    if (coin._bobTween) {
+      coin._bobTween.stop();
+      coin._bobTween = null;
+    }
+  });
+
+  if (this.flapParticles && this.flapParticles.stop) {
+    this.flapParticles.stop();
+  }
+
   this.savedCoins += this.runCoins;
   this.registry.set(REG.COINS, this.savedCoins);
   saveCoins(this.savedCoins);
@@ -1057,37 +1095,16 @@ PlayScene.prototype.triggerGameOver = function () {
     saveHighScore(this.score);
   }
 
-  // These effects are nice, but should never block Game Over.
-  try {
-    if (this.cameras && this.cameras.main) {
-      this.cameras.main.shake(180, 0.008);
-    }
-
-    if (this.flapParticles && this.flapParticles.stop) {
-      this.flapParticles.stop();
-    }
-
-    if (this.coins) {
-      this.coins.getChildren().forEach(coin => {
-        if (coin._bobTween) {
-          coin._bobTween.stop();
-          coin._bobTween = null;
-        }
-      });
-    }
-
-    if (this.physics) {
-      this.physics.pause();
-    }
-  } catch (error) {
-    console.warn("Game over cleanup had an issue, but continuing:", error);
+  if (this.cameras && this.cameras.main) {
+    this.cameras.main.shake(180, 0.008);
   }
 
-  // Move to Game Over after the shake moment.
-  this.time.delayedCall(600, () => {
+  this.gameOverTimer = this.time.delayedCall(600, () => {
+    this.gameOverTimer = null;
     this.scene.start("GameOverScene", { score: this.score });
   });
 };
+
 
 
 /* =========================================================
