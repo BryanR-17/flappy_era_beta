@@ -887,16 +887,22 @@ PlayScene.prototype.refreshDifficulty = function () {
   this.pipeSpawnDelay = Math.round(Phaser.Math.Linear(this.basePipeSpawnDelay, this.minPipeSpawnDelay, easedProgress));
 
   getGroupChildrenSafe(this.pipes).forEach(pipe => {
-    if (pipe.body) pipe.body.setVelocityX(-this.pipeSpeed);
+    if (pipe.body) {
+      pipe.body.setVelocityX(-this.pipeSpeed);
+    }
   });
 
-  getGroupChildrenSafe(this.coins).forEach(c => {
-    if (coin.body) coin.body.setVelocityX(-this.pipeSpeed);
+  getGroupChildrenSafe(this.coins).forEach(coin => {
+    if (coin.body) {
+      coin.body.setVelocityX(-this.pipeSpeed);
+    }
   });
 };
 
+
 PlayScene.prototype.incrementScore = function () {
   this.score++;
+}
   this.scoreText.setText(this.score);
   this.animateScoreUi();
 
