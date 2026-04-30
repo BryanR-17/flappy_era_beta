@@ -539,7 +539,7 @@ PlayScene.prototype.create = function () {
 
   this.player = this.physics.add.sprite(110, height/2, charObj.key);
   this.player.setScale(SCALES.PLAYER);
-  this.player.setScale(3);
+  this.player.setDepth(3);
   this.player.setActive(true).setVisible(true);
   this.player.body.enable = true;
   this.player.body.setCollideWorldBounds(true);
@@ -1071,39 +1071,46 @@ PlayScene.prototype.triggerGameOver = function () {
   if (this.isGameOver) return;
   this.isGameOver = true;
 
-  this.cameras.main.shake(180, 0.008);
-  this.physics.pause();
+  const finishGameOver = () => {
+    this.gameOverTimer = null;
+    this.scene.start("GameOverScene", { score: this.score });
+  };
+
+  this.gameOverTimer = this.time.delayedCall(600, finishGameOver);
+
+  if (this.cameras && this.cameras.main) {
+    this.cameras.main.shake(180, 0.008);
+  }
+
+  if (this.physics) {
+    this.physics.pause();
+  }
+
   if (this.pipeTimer) {
     this.pipeTimer.remove();
     this.pipeTimer = null;
   }
-  if (this.gameOverTimer) {
-    this.gameOverTimer.remove();
-    this.gameOverTimer = null;
-  }
+
   if (this.flapParticles) this.flapParticles.stop();
 
-  this.coins.getChildren().forEach(coin => {
-    if (coin._bobTween) {
-      coin._bobTween.stop();
-      coin._bobTween = null;
-    }
-  });
+  if (this.coins) {
+    this.coins.getChildren().forEach(coin => {
+      if (coin._bobTween) {
+        coin._bobTween.stop();
+        coin._bobTween = null;
+      }
+    });
+  }
 
   this.savedCoins += this.runCoins;
   this.registry.set(REG.COINS, this.savedCoins);
   saveCoins(this.savedCoins);
 
-  const hs = this.registry.get(REG.HIGH_SCORE);
+  const hs = this.registry.get(REG.HIGH_SCORE) || 0;
   if (this.score > hs) {
     this.registry.set(REG.HIGH_SCORE, this.score);
     saveHighScore(this.score);
   } 
-
-  this.gameOverTimer = this.time.delayedCall(600, () => {
-    this.gameOverTimer = null;
-    this.scene.start("GameOverScene", { score: this.score });
-  });
 };
 
 /* =========================================================
