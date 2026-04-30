@@ -534,6 +534,10 @@ PlayScene.prototype.create = function () {
   this.lastFlapTime = 0;
   this.flapCooldown = 120;
 
+  // Reset scene object references from the previous PlayScene run.
+  // Phaser reuses the scene object, so old destroyed objects can still be stored here.
+  this.bg = null;
+
   this.eraIndex = 0;
   this.applyEraVisuals();
 
@@ -1006,7 +1010,7 @@ PlayScene.prototype.applyEraVisuals = function () {
 
   // Create the background once, then reuse it when eras change.
   // This avoids old background fade tweens/destroy calls causing second-run crashes.
-  if (!this.bg) {
+  if (!this.bg || !this.bg.scene) {
     this.bg = this.add.image(width / 2, height / 2, era.bgKey);
     this.bg.setDepth(-10);
   } else {
