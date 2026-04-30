@@ -676,6 +676,11 @@ PlayScene.prototype.create = function () {
       this.startPromptTween = null;
     }
 
+    if (this.startPromptFadeTween) {
+      this.startPromptFadeTween.stop();
+      this.startPromptFadeTween = null; 
+    }
+
     this.handlePointerDown = null;
     this.handleKeyDown = null;
   };
@@ -822,17 +827,22 @@ PlayScene.prototype.startRun = function () {
   this.player.body.reset(this.player.x, this.player.y);
   this.player.body.setAllowGravity(true);
 
-  this.tweens.add({
+  this.startPromptFadeTween = this.tweens.add({
     targets: [this.startPromptBg, this.startPrompt],
     alpha: 0,
     duration: 180,
     onComplete: () => {
-      if (this.startPromptBg) this.startPromptBg.destroy();
-      if (this.startPrompt) this.startPrompt.destroy();
-      this.startPromptBg = null;
-      this.startPrompt = null;
-    }
-  });
+      if (this.startPromptBg) {
+      this.startPromptBg.setVisible(false);
+      this.startPromptBg.setActive(false);
+      } 
+
+      if (this.startPrompt) {
+        this.startPrompt.setVisible(false);
+        this.startPrompt.setActive(false);
+      }
+    }   
+  }); 
 
   this.scheduleNextPipe(this.firstPipeDelay);
 };
@@ -843,6 +853,7 @@ PlayScene.prototype.scheduleNextPipe = function (delay) {
   if (this.pipeTimer) {
     this.pipeTimer.remove();
     this.pipeTimer = null;
+    this.startPromptFadeTween = null;
   }
 
   this.pipeTimer = this.time.delayedCall(delay, () => {
