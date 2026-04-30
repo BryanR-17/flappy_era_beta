@@ -653,8 +653,11 @@ PlayScene.prototype.create = function () {
     if (this.didCleanup) return;
     this.didCleanup = true;
 
-    this.input.off("pointerdown", this.handlePointerDown);
-    if (this.input.keyboard) {
+    if (this.handleFlapInput) {
+      this.input.off("pointerdown", this.handlePointerDown);
+    }
+
+    if (this.input.keyboard && this.handleKeyDown) { 
       this.input.keyboard.off("keydown", this.handleKeyDown);
     }
 
@@ -673,55 +676,10 @@ PlayScene.prototype.create = function () {
       this.startPromptTween = null;
     }
 
-    if (this.flapParticles) {
-      this.flapParticles.destroy();
-      this.flapParticles = null;
-    }
-
-    if (this.coins) {
-      this.coins.getChildren().forEach(coin => {
-        if (coin._bobTween) {
-          coin._bobTween.stop();
-          coin._bobTween = null;
-        }
-      });
-      this.coins.clear(true, true);
-    }
-
-    if (this.pipes) {
-      this.pipes.getChildren().forEach(pipe => {
-        if (pipe.visual) {
-          pipe.visual.destroy();
-          pipe.visual = null;
-        }
-      });
-      this.pipes.clear(true, true);
-    }
-
-    if (this.coinSensor) {
-      this.coinSensor.destroy();
-      this.coinSensor = null;
-    }
-
-    if (this.player) {
-      this.player.destroy();
-      this.player = null;
-    }
-
-    if (this.ground) {
-      this.ground.destroy();
-      this.ground = null;
-    }
-
-    if (this.bg) {
-      this.bg.destroy();
-      this.bg = null;
-    }
-
-    this.tweens.killAll();
     this.handlePointerDown = null;
     this.handleKeyDown = null;
   };
+
 
   this.events.once("shutdown", cleanupScene);
   this.events.once("destroy", cleanupScene);
