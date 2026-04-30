@@ -170,6 +170,25 @@ function createEraMenuBackground(scene) {
   }
 }
 
+function createCharacterSpotlight(scene, x, y, color = 0x7cf5ff) {
+  const beam = scene.add.triangle(x, y - 10, 0, -135, -85, 95, 85, 95, color, 0.08);
+  const glow = scene.add.ellipse(x, y + 74, 175, 38, color, 0.18);
+  const ring = scene.add.ellipse(x, y + 76, 135, 24, 0xffffff, 0)
+    .setStrokeStyle(2, 0xffffff, 0.35);
+
+  scene.tweens.add({
+    targets: [glow, ring],
+    scaleX: 1.08,
+    scaleY: 1.12,
+    duration: 950,
+    yoyo: true,
+    repeat: -1,
+    ease: "Sine.easeInOut"
+  });
+
+  return { beam, glow, ring };
+}
+
 
 // Eras
 const ERAS = [
@@ -258,6 +277,8 @@ MenuScene.prototype.create = function () {
   const selectedKey = this.registry.get(REG.CHARACTER);
   const charObj = CHARACTERS.find(c => c.key === selectedKey) || CHARACTERS[0];
 
+  createCharacterSpotlight(this, width / 2, 270, 0x7cf5ff);
+
   const preview = this.add.sprite(width/2, 270, charObj.key)
     .setScale(SCALES.MENU_PREVIEW);
 
@@ -320,6 +341,8 @@ CharacterSelectScene.prototype.create = function () {
   let selectedKey = this.registry.get(REG.CHARACTER);
   if (!unlocked.includes(selectedKey)) selectedKey = "dino";
   let selectedObj = CHARACTERS.find(c => c.key === selectedKey) || CHARACTERS[0];
+
+  createCharacterSpotlight(this, width / 2, 230, 0xffd66b);
 
   const preview = this.add.sprite(width/2, 230, selectedObj.key)
     .setScale(SCALES.SELECT_PREVIEW);
