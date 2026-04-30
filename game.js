@@ -11,7 +11,7 @@ const SCALES = {
 };
 
 // Thicker voxel pipes
-const PILLAR_WIDTH_MULT = 1.9;
+const PILLAR_WIDTH_MULT = 2.3;
 
 // Asset folders
 const ASSET_PATHS = {
@@ -41,10 +41,10 @@ const CHARACTERS = [
 // Shop prices
 const CHARACTER_COSTS = {
   dino: 0,
-  bird: 25,
-  robot: 60,
-  cat: 40,
-  alien: 80
+  bird: 100,
+  robot: 120,
+  cat: 120,
+  alien: 140
 };
 
 // LocalStorage keys
