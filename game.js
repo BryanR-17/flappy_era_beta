@@ -867,7 +867,6 @@ PlayScene.prototype.scheduleNextPipe = function (delay) {
   if (this.pipeTimer) {
     this.pipeTimer.remove();
     this.pipeTimer = null;
-    this.startPromptFadeTween = null;
   }
 
   this.pipeTimer = this.time.delayedCall(delay, () => {
@@ -1001,59 +1000,36 @@ PlayScene.prototype.collectCoin = function (_sensor, coin) {
   }
 };
 
-PlayScene.prototype.applyEraVisuals = function (animateTransition) {
+PlayScene.prototype.applyEraVisuals = function () {
   const { width, height } = this.scale;
   const era = ERAS[this.eraIndex];
-  const oldBg = this.bg || null;
 
-  const nextBg = this.add.image(width / 2, height / 2, era.bgKey);
+  // Create the background once, then reuse it when eras change.
+  // This avoids old background fade tweens/destroy calls causing second-run crashes.
+  if (!this.bg) {
+    this.bg = this.add.image(width / 2, height / 2, era.bgKey);
+    this.bg.setDepth(-10);
+  } else {
+    this.bg.setTexture(era.bgKey);
+  }
 
-  const scaleX = width / nextBg.width;
-  const scaleY = height / nextBg.height;
+  const scaleX = width / this.bg.width;
+  const scaleY = height / this.bg.height;
   const scale = Math.max(scaleX, scaleY);
 
-  nextBg.setScale(scale);
-  nextBg.setDepth(-10);
-  nextBg.setAlpha(oldBg && animateTransition ? 0 : 1);
-
-  if (oldBg) oldBg.setDepth(-11);
-  this.bg = nextBg;
+  this.bg.setScale(scale);
+  this.bg.setAlpha(1);
 
   if (this.eraText) {
     this.eraText.setText(era.name);
-    this.tweens.add({
-      targets: this.eraText,
-      alpha: 1,
-      scale: 1.08,
-      duration: 120,
-      yoyo: true,
-      ease: "Sine.easeOut"
-    });
-  }
-
-  if (oldBg && animateTransition) {
-    this.tweens.add({
-      targets: nextBg,
-      alpha: 1,
-      duration: 260,
-      ease: "Sine.easeOut"
-    });
-
-    this.tweens.add({
-      targets: oldBg,
-      alpha: 0,
-      duration: 260,
-      ease: "Sine.easeOut",
-      onComplete: () => oldBg.destroy()
-    });
-  } else if (oldBg) {
-    oldBg.destroy();
+    this.eraText.setScale(1);
+    this.eraText.setAlpha(0.85);
   }
 };
 
 PlayScene.prototype.switchEra = function () {
   this.eraIndex = (this.eraIndex + 1) % ERAS.length;
-  this.applyEraVisuals(true);
+  this.applyEraVisuals();
 };
 
 PlayScene.prototype.triggerGameOver = function () {
