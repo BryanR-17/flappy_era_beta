@@ -902,13 +902,13 @@ PlayScene.prototype.refreshDifficulty = function () {
 
 PlayScene.prototype.incrementScore = function () {
   this.score++;
-}
   this.scoreText.setText(this.score);
   this.animateScoreUi();
 
   if (this.score % 15 === 0) this.switchEra();
   this.refreshDifficulty();
 };
+
 
 PlayScene.prototype.spawnPipePair = function () {
   const { width, height } = this.scale;
