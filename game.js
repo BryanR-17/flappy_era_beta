@@ -11,7 +11,7 @@ const SCALES = {
 };
 
 // Thicker voxel pipes
-const PILLAR_WIDTH_MULT = 2.3;
+const PILLAR_WIDTH_MULT = 2.5;
 
 // Asset folders
 const ASSET_PATHS = {
@@ -121,6 +121,56 @@ function getGroupChildrenSafe(group) {
   return group.children.entries.slice();
 }
 
+function createEraMenuBackground(scene) {
+  const { width, height } = scene.scale;
+
+  scene.add.rectangle(width / 2, height / 2, width, height, 0x081018);
+
+  const colors = [0x6bdc6b, 0xffc45c, 0x36f1ff, 0xb7b4ff];
+
+  for (let i = 0; i < 4; i++) {
+    const x = 52 + i * 105;
+
+    const panel = scene.add.rectangle(x, height - 115, 82, 190, colors[i], 0.13)
+      .setStrokeStyle(2, colors[i], 0.3);
+
+    scene.tweens.add({
+      targets: panel,
+      y: panel.y - 8,
+      duration: 1400 + i * 180,
+      yoyo: true,
+      repeat: -1,
+      ease: "Sine.easeInOut"
+    });
+  }
+
+  scene.add.triangle(62, height - 155, 0, 80, 42, 0, 84, 80, 0x1f5b34, 0.65);
+  scene.add.rectangle(160, height - 142, 42, 105, 0x6b5338, 0.7);
+  scene.add.rectangle(160, height - 204, 58, 24, 0x6b5338, 0.7);
+  scene.add.rectangle(260, height - 155, 18, 125, 0x18e7ff, 0.45);
+  scene.add.rectangle(290, height - 135, 14, 85, 0xff4df3, 0.45);
+  scene.add.circle(365, height - 190, 28, 0xdedbff, 0.45);
+
+  for (let i = 0; i < 28; i++) {
+    const dot = scene.add.circle(
+      Phaser.Math.Between(10, width - 10),
+      Phaser.Math.Between(20, height - 210),
+      Phaser.Math.Between(1, 3),
+      0xffffff,
+      Phaser.Math.FloatBetween(0.2, 0.55)
+    );
+
+    scene.tweens.add({
+      targets: dot,
+      alpha: Phaser.Math.FloatBetween(0.05, 0.25),
+      duration: Phaser.Math.Between(900, 1800),
+      yoyo: true,
+      repeat: -1
+    });
+  }
+}
+
+
 // Eras
 const ERAS = [
   { key: "prehistoric", name: "Prehistoric", bgKey: "bg_prehistoric", bgFile: `${ASSET_PATHS.ERAS}/prehistoric_voxel.png` },
@@ -194,7 +244,7 @@ MenuScene.prototype.create = function () {
   if (!this.registry.has(REG.COINS)) this.registry.set(REG.COINS, loadCoins());
   if (!this.registry.has(REG.UNLOCKED)) this.registry.set(REG.UNLOCKED, loadUnlocked());
 
-  this.add.rectangle(width/2, height/2, width, height, 0x0e0e14);
+  createEraMenuBackground(this);
 
   this.add.text(width/2, 110, "FLAPPY ERAS", {
     fontFamily: "Arial Black", fontSize: "46px", color: "#ffffff",
@@ -531,7 +581,7 @@ PlayScene.prototype.resetRunState = function () {
   this.savedCoins = Number.isFinite(registryCoins) ? registryCoins : loadCoins();
 
   this.basePipeSpeed = 175;
-  this.maxPipeSpeed = 265;
+  this.maxPipeSpeed = 285;
   this.basePipeGap = 210;
   this.minPipeGap = 145;
   this.basePipeSpawnDelay = 1550;
