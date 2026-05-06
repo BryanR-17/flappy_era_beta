@@ -1325,12 +1325,16 @@ PlayScene.prototype.triggerGameOver = function () {
     this.flapParticles.stop();
   }
 
+  // Add only this run's coins to the saved total once the run is over.
   this.savedCoins += this.runCoins;
   this.registry.set(REG.COINS, this.savedCoins);
   saveCoins(this.savedCoins);
 
-  const hs = this.registry.get(REG.HIGH_SCORE) || 0;
-  if (this.score > hs) {
+  const previousHighScore = this.registry.get(REG.HIGH_SCORE) || 0;
+  const isNewBest = this.score > previousHighScore;
+  const finalHighScore = isNewBest ? this.score : previousHighScore;
+
+  if (isNewBest) {
     this.registry.set(REG.HIGH_SCORE, this.score);
     saveHighScore(this.score);
   }
@@ -1341,9 +1345,17 @@ PlayScene.prototype.triggerGameOver = function () {
 
   this.gameOverTimer = this.time.delayedCall(600, () => {
     this.gameOverTimer = null;
-    this.scene.start("GameOverScene", { score: this.score });
+
+    this.scene.start("GameOverScene", {
+      score: this.score,
+      runCoins: this.runCoins,
+      totalCoins: this.savedCoins,
+      highScore: finalHighScore,
+      isNewBest: isNewBest
+    });
   });
 };
+
 
 
 
@@ -1356,14 +1368,18 @@ GameOverScene.prototype.constructor = GameOverScene;
 
 GameOverScene.prototype.init = function (data) {
   this.finalScore = data.score || 0;
+  this.runCoins = data.runCoins || 0;
+  this.totalCoins = data.totalCoins || 0;
+  this.highScore = data.highScore || 0;
+  this.isNewBest = data.isNewBest || false;
 };
 
 GameOverScene.prototype.create = function () {
   const { width, height } = this.scale;
 
-  this.add.rectangle(width/2, height/2, width, height, 0x0d0d12);
+  this.add.rectangle(width / 2, height / 2, width, height, 0x0d0d12);
 
-  this.add.text(width/2, 140, "YOU TIME-LAPSED!", {
+  this.add.text(width / 2, 92, "YOU TIME-LAPSED!", {
     fontFamily: "Arial Black",
     fontSize: "30px",
     color: "#ff7777",
@@ -1371,33 +1387,73 @@ GameOverScene.prototype.create = function () {
     strokeThickness: 6
   }).setOrigin(0.5);
 
-  const hs = this.registry.get(REG.HIGH_SCORE);
-  const coins = this.registry.get(REG.COINS) || 0;
+  if (this.isNewBest) {
+    this.add.text(width / 2, 136, "NEW BEST!", {
+      fontFamily: "Arial Black",
+      fontSize: "22px",
+      color: "#ffef85",
+      stroke: "#000000",
+      strokeThickness: 5
+    }).setOrigin(0.5);
+  }
 
-  this.add.text(width/2, 230, `Score: ${this.finalScore}`, {
-    fontFamily: "Arial Black", fontSize: "24px", color: "#ffffff"
+  const cardY = 244;
+
+  this.add.rectangle(width / 2, cardY, 315, 170, 0x171722, 0.9)
+    .setStrokeStyle(3, this.isNewBest ? 0xffef85 : 0xffffff, 0.55);
+
+  this.add.text(width / 2, cardY - 62, "RUN SUMMARY", {
+    fontFamily: "Arial Black",
+    fontSize: "16px",
+    color: "#d9f7ff",
+    stroke: "#000000",
+    strokeThickness: 3
   }).setOrigin(0.5);
 
-  this.add.text(width/2, 270, `Best: ${hs}`, {
-    fontFamily: "Arial Black", fontSize: "18px", color: "#ffef85"
+  this.add.text(width / 2, cardY - 28, `Score: ${this.finalScore}`, {
+    fontFamily: "Arial Black",
+    fontSize: "24px",
+    color: "#ffffff",
+    stroke: "#000000",
+    strokeThickness: 4
   }).setOrigin(0.5);
 
-  this.add.text(width/2, 300, `Coins: ${coins}`, {
-    fontFamily: "Arial Black", fontSize: "16px", color: "#ffd66b"
+  this.add.text(width / 2, cardY + 8, `Best: ${this.highScore}`, {
+    fontFamily: "Arial Black",
+    fontSize: "18px",
+    color: "#ffef85",
+    stroke: "#000000",
+    strokeThickness: 3
   }).setOrigin(0.5);
 
-  const replayBtn = makeButton(this, width/2, 360, 220, 60, 0x44dd77, "REPLAY");
+  this.add.text(width / 2, cardY + 42, `Run Coins: +${this.runCoins}`, {
+    fontFamily: "Arial Black",
+    fontSize: "18px",
+    color: "#ffd66b",
+    stroke: "#000000",
+    strokeThickness: 3
+  }).setOrigin(0.5);
+
+  this.add.text(width / 2, cardY + 72, `Total Coins: ${this.totalCoins}`, {
+    fontFamily: "Arial Black",
+    fontSize: "16px",
+    color: "#ffd66b",
+    stroke: "#000000",
+    strokeThickness: 3
+  }).setOrigin(0.5);
+
+  const replayBtn = makeButton(this, width / 2, 390, 220, 56, 0x44dd77, "REPLAY");
   replayBtn.on("pointerup", () => this.scene.start("PlayScene"));
 
-  const charBtn = makeButton(this, width/2, 435, 240, 55, 0x5599ff, "SELECT");
+  const charBtn = makeButton(this, width / 2, 456, 240, 48, 0x5599ff, "SELECT");
   charBtn.on("pointerup", () => this.scene.start("CharacterSelectScene"));
 
-  const shopBtn = makeButton(this, width/2, 500, 240, 55, 0xffd34d, "SHOP");
+  const shopBtn = makeButton(this, width / 2, 512, 240, 48, 0xffd34d, "SHOP");
   shopBtn.on("pointerup", () => this.scene.start("ShopScene"));
 
-  const menuBtn = makeButton(this, width/2, 565, 160, 45, 0x666677, "MENU");
+  const menuBtn = makeButton(this, width / 2, 574, 160, 42, 0x666677, "MENU");
   menuBtn.on("pointerup", () => this.scene.start("MenuScene"));
-};
+}
 
 /* =========================================================
    BUTTON MAKER (supports options)
