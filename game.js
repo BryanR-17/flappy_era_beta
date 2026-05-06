@@ -444,10 +444,10 @@ ShopScene.prototype.create = function () {
   // Grid
   const cols = 3;
   const cellW = 132;
-  const cellH = 105;
-  const cardW = 118;
-  const cardH = 100;
-  const gridTop = 395;
+  const cellH = 112;
+  const cardW = 120;
+  const cardH = 106;
+  const gridTop = 392;
   const cardRefreshers = [];
 
   const refreshCards = () => {
@@ -457,68 +457,114 @@ ShopScene.prototype.create = function () {
   const renderCard = (c, idx) => {
     const col = idx % cols;
     const row = Math.floor(idx / cols);
-    const cx = width/2 + (col - 1) * cellW;
+    const cx = width / 2 + (col - 1) * cellW;
     const cy = gridTop + row * cellH;
-
-    const card = this.add.rectangle(cx, cy, cardW, cardH, 0x000000, 0.35)
-      .setStrokeStyle(2, 0xffffff);
-
-    // icon (smaller)
-    const icon = this.add.sprite(cx, cy - 25, c.key);
-    const iconMaxW = cardW * 0.50;
-    const iconMaxH = cardH * 0.38;
-    const iconScale = Math.min(iconMaxW / icon.width, iconMaxH / icon.height);
-    icon.setScale(iconScale);
-
-    // name
-    this.add.text(cx, cy + 4, c.name, {
-      fontFamily: "Arial Black", fontSize: "12px", color: "#ffffff"
-    }).setOrigin(0.5);
 
     const cost = CHARACTER_COSTS[c.key] ?? 0;
 
-    // price
-    const priceText = this.add.text(cx, cy + 22, "", {
-      fontFamily: "Arial Black", fontSize: "12px", color: "#ffd66b"
+    const card = this.add.rectangle(cx, cy, cardW, cardH, 0x171722, 0.92)
+      .setStrokeStyle(2, 0xffffff, 0.45)
+      .setInteractive({ useHandCursor: true });
+
+    const cardTopGlow = this.add.rectangle(cx, cy - 38, cardW - 10, 20, 0xffffff, 0.08);
+
+    const iconCircle = this.add.ellipse(cx, cy - 25, 52, 40, 0x000000, 0.22);
+
+    const icon = this.add.sprite(cx, cy - 27, c.key);
+    const iconMaxW = cardW * 0.48;
+    const iconMaxH = cardH * 0.34;
+    const iconScale = Math.min(iconMaxW / icon.width, iconMaxH / icon.height);
+    icon.setScale(iconScale);
+
+    const nameText = this.add.text(cx, cy + 1, c.name, {
+      fontFamily: "Arial Black",
+      fontSize: "12px",
+      color: "#ffffff",
+      stroke: "#000000",
+      strokeThickness: 3
     }).setOrigin(0.5);
 
-    // button inside card (no hover grow)
-    const btn = makeButton(this, cx, cy + 42, 92, 22, 0xffd34d, "BUY", {
-      fontSize: 12,
-      hoverScale: 1.0
+    const statusPill = this.add.rectangle(cx, cy + 21, 86, 18, 0x444455, 0.9)
+      .setStrokeStyle(1, 0xffffff, 0.25);
+
+    const statusText = this.add.text(cx, cy + 21, "", {
+      fontFamily: "Arial Black",
+      fontSize: "10px",
+      color: "#ffffff"
+    }).setOrigin(0.5);
+
+    const btn = makeButton(this, cx, cy + 44, 92, 23, 0xffd34d, "BUY", {
+      fontSize: 11,
+      hoverScale: 1.02
     });
+
+    const previewThis = () => {
+      preview.setTexture(c.key);
+      fitPreview();
+      previewName.setText(c.name);
+      msg.setText(`Previewing ${c.name}`);
+    };
+
+    const selectCharacter = () => {
+      this.registry.set(REG.CHARACTER, c.key);
+      preview.setTexture(c.key);
+      fitPreview();
+      previewName.setText(c.name);
+      msg.setText(`Selected ${c.name}`);
+      refreshCards();
+    };
 
     const updateCard = () => {
       const coins = this.registry.get(REG.COINS) || 0;
       const unlocked = this.registry.get(REG.UNLOCKED) || ["dino"];
       const owned = unlocked.includes(c.key);
+      const selected = this.registry.get(REG.CHARACTER) === c.key;
+      const canBuy = coins >= cost;
+
+      if (selected) {
+        icon.clearTint();
+        card.setFillStyle(0x1d2c30, 0.95);
+        card.setStrokeStyle(3, 0x7cf5ff, 0.95);
+        iconCircle.setFillStyle(0x7cf5ff, 0.18);
+        statusPill.setFillStyle(0x44dd77, 0.95);
+        statusText.setText("SELECTED");
+        btn.setFillStyle(0x44dd77, 1);
+        btn.text.setText("USING");
+        btn.setAlpha(1);
+        return;
+      }
 
       if (owned) {
         icon.clearTint();
-        card.setStrokeStyle(2, 0x44dd77);
+        card.setFillStyle(0x171722, 0.92);
+        card.setStrokeStyle(2, 0x44dd77, 0.85);
+        iconCircle.setFillStyle(0x44dd77, 0.14);
+        statusPill.setFillStyle(0x44dd77, 0.9);
+        statusText.setText("OWNED");
+        btn.setFillStyle(0x44dd77, 1);
         btn.text.setText("SELECT");
-        priceText.setText("OWNED");
-      } else {
-        icon.setTint(0x777777);
-        card.setStrokeStyle(2, 0xffffff);
-        btn.text.setText("BUY");
-        priceText.setText(`${cost} coins`);
+        btn.setAlpha(1);
+        return;
       }
 
-      btn.setAlpha(!owned && coins < cost ? 0.7 : 1);
+      icon.setTint(0x777777);
+      card.setFillStyle(0x171722, 0.92);
+      card.setStrokeStyle(2, canBuy ? 0xffd34d : 0xffffff, canBuy ? 0.9 : 0.35);
+      iconCircle.setFillStyle(0x000000, 0.24);
+      statusPill.setFillStyle(canBuy ? 0xffd34d : 0x555566, 0.9);
+      statusText.setText(`${cost} COINS`);
+      btn.setFillStyle(canBuy ? 0xffd34d : 0x777783, 1);
+      btn.text.setText(canBuy ? "BUY" : "LOCKED");
+      btn.setAlpha(canBuy ? 1 : 0.72);
     };
 
-    btn.on("pointerup", () => {
+    const buyOrSelect = () => {
       let coins = this.registry.get(REG.COINS) || 0;
       let unlocked = this.registry.get(REG.UNLOCKED) || ["dino"];
       const owned = unlocked.includes(c.key);
 
       if (owned) {
-        this.registry.set(REG.CHARACTER, c.key);
-        preview.setTexture(c.key);
-        fitPreview();
-        previewName.setText(c.name);
-        msg.setText(`Selected ${c.name}`);
+        selectCharacter();
         return;
       }
 
@@ -532,23 +578,23 @@ ShopScene.prototype.create = function () {
 
       this.registry.set(REG.COINS, coins);
       this.registry.set(REG.UNLOCKED, unlocked);
+      this.registry.set(REG.CHARACTER, c.key);
+
       saveCoins(coins);
       saveUnlocked(unlocked);
 
-      msg.setText(`Unlocked ${c.name}!`);
-      refreshHud();
-      refreshCards();
-    });
-
-    const previewThis = () => {
       preview.setTexture(c.key);
       fitPreview();
       previewName.setText(c.name);
-      msg.setText(`Previewing ${c.name}`);
+      msg.setText(`Unlocked and selected ${c.name}!`);
+
+      refreshHud();
+      refreshCards();
     };
 
-    card.setInteractive({ useHandCursor: true }).on("pointerup", previewThis);
+    card.on("pointerup", previewThis);
     icon.setInteractive({ useHandCursor: true }).on("pointerup", previewThis);
+    btn.on("pointerup", buyOrSelect);
 
     updateCard();
     return updateCard;
