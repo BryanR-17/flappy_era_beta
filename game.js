@@ -290,7 +290,37 @@ const ERAS = [
   { key: "space",       name: "Space",       bgKey: "bg_space",       bgFile: `${ASSET_PATHS.ERAS}/space_voxel.png` }
 ];
 
+// Cropped pieces from the actual era backgrounds.
+// These become subtle moving background details.
+const BACKGROUND_DRIFTERS = {
+  prehistoric: [
+    { x: 450, y: 80, w: 300, h: 145, scale: 0.42, alpha: 0.42, speed: 7,  yMin: 70, yMax: 150 },
+    { x: 885, y: 130, w: 145, h: 75, scale: 0.55, alpha: 0.34, speed: 10, yMin: 85, yMax: 180 },
+    { x: 188, y: 75, w: 120, h: 70, scale: 0.55, alpha: 0.34, speed: 13, yMin: 70, yMax: 170 }
+  ],
 
+  medieval: [
+    { x: 95, y: 65, w: 250, h: 135, scale: 0.42, alpha: 0.42, speed: 7,  yMin: 70, yMax: 155 },
+    { x: 650, y: 65, w: 235, h: 135, scale: 0.46, alpha: 0.38, speed: 9,  yMin: 75, yMax: 165 },
+    { x: 42, y: 275, w: 120, h: 65, scale: 0.58, alpha: 0.30, speed: 12, yMin: 90, yMax: 210 }
+  ],
+
+  cyberpunk: [
+    { x: 80, y: 28, w: 45, h: 45, scale: 0.55, alpha: 0.45, speed: 10, yMin: 40, yMax: 220 },
+    { x: 400, y: 28, w: 45, h: 45, scale: 0.50, alpha: 0.42, speed: 13, yMin: 50, yMax: 260 },
+    { x: 900, y: 20, w: 55, h: 55, scale: 0.48, alpha: 0.42, speed: 8,  yMin: 45, yMax: 230 }
+  ],
+
+  space: [
+    { x: 700, y: 95, w: 210, h: 240, scale: 0.45, alpha: 0.30, speed: 5,  yMin: 70, yMax: 210 },
+    { x: 720, y: 105, w: 70, h: 70, scale: 0.55, alpha: 0.46, speed: 9,  yMin: 55, yMax: 230 },
+    { x: 35, y: 25, w: 55, h: 70, scale: 0.55, alpha: 0.42, speed: 11, yMin: 45, yMax: 220 }
+  ]
+};
+
+function getBackgroundDrifterFrameName(eraKey, index) {
+  return `${eraKey}_drifter_${index}`;
+}
 
 /* =========================================================
    BOOT SCENE
@@ -875,52 +905,50 @@ PlayScene.prototype.createFlapParticles = function () {
   this.flapParticles.setDepth(1);
 };
 
+PlayScene.prototype.createBackgroundDrifterFrames = function () {
+  ERAS.forEach(era => {
+    const texture = this.textures.get(era.bgKey);
+    const frames = BACKGROUND_DRIFTERS[era.key] || [];
+
+    frames.forEach((frame, index) => {
+      const frameName = getBackgroundDrifterFrameName(era.key, index);
+
+      if (!texture.has(frameName)) {
+        texture.add(frameName, 0, frame.x, frame.y, frame.w, frame.h);
+      }
+    });
+  });
+};
+
 PlayScene.prototype.createAtmosphereLayer = function (width, height) {
+  this.createBackgroundDrifterFrames();
   this.atmosphereItems = [];
 
-  // Big soft clouds drifting behind gameplay.
+  const era = ERAS[this.eraIndex];
+  const frames = BACKGROUND_DRIFTERS[era.key] || [];
+
   for (let i = 0; i < 5; i++) {
-    const cloud = this.add.container(
+    const frameIndex = i % frames.length;
+    const frameName = getBackgroundDrifterFrameName(era.key, frameIndex);
+
+    const drifter = this.add.image(
       Phaser.Math.Between(0, width),
-      Phaser.Math.Between(70, height - 220)
+      Phaser.Math.Between(70, 210),
+      era.bgKey,
+      frameName
     );
 
-    const puffColor = 0xffffff;
-    const puffAlpha = 0.18;
-
-    cloud.add(this.add.ellipse(-28, 0, 70, 28, puffColor, puffAlpha));
-    cloud.add(this.add.ellipse(14, -8, 82, 34, puffColor, puffAlpha));
-    cloud.add(this.add.ellipse(52, 2, 58, 24, puffColor, puffAlpha));
-
-    cloud.setDepth(-8);
-    cloud.setScale(Phaser.Math.FloatBetween(0.75, 1.25));
+    drifter.setOrigin(0.5);
+    drifter.setDepth(-8);
 
     this.atmosphereItems.push({
-      obj: cloud,
-      speed: Phaser.Math.FloatBetween(8, 16),
-      drift: Phaser.Math.FloatBetween(0.15, 0.35),
-      kind: "cloud"
-    });
-  }
-
-  // Small floating motes give the scene subtle motion without being distracting.
-  for (let i = 0; i < 16; i++) {
-    const mote = this.add.rectangle(
-      Phaser.Math.Between(0, width),
-      Phaser.Math.Between(40, height - 80),
-      Phaser.Math.Between(2, 5),
-      Phaser.Math.Between(2, 5),
-      0xffffff,
-      0.24
-    );
-
-    mote.setDepth(-7);
-
-    this.atmosphereItems.push({
-      obj: mote,
-      speed: Phaser.Math.FloatBetween(12, 26),
-      drift: Phaser.Math.FloatBetween(0.25, 0.65),
-      kind: "mote"
+      obj: drifter,
+      slot: i,
+      speed: 8,
+      drift: Phaser.Math.FloatBetween(0.12, 0.28),
+      phase: Phaser.Math.FloatBetween(0, Math.PI * 2),
+      yMin: 70,
+      yMax: 210
     });
   }
 
@@ -930,49 +958,43 @@ PlayScene.prototype.createAtmosphereLayer = function (width, height) {
 PlayScene.prototype.refreshAtmosphereVisuals = function () {
   if (!this.atmosphereItems) return;
 
-  const era = ERAS[this.eraIndex].key;
+  const era = ERAS[this.eraIndex];
+  const frames = BACKGROUND_DRIFTERS[era.key] || [];
+  if (!frames.length) return;
 
-  const colors = {
-    prehistoric: { cloud: 0xffffff, mote: 0xffefb0 },
-    medieval: { cloud: 0xfff0c8, mote: 0xd8ff9f },
-    cyberpunk: { cloud: 0x7cf5ff, mote: 0xff4dff },
-    space: { cloud: 0x9bbcff, mote: 0xffffff }
-  };
-
-  const eraColors = colors[era] || colors.prehistoric;
-
-  this.atmosphereItems.forEach(item => {
+  this.atmosphereItems.forEach((item, index) => {
     if (!item.obj || !item.obj.scene) return;
 
-    if (item.kind === "cloud") {
-      item.obj.list.forEach(part => {
-        part.setFillStyle(eraColors.cloud, era === "space" ? 0.10 : 0.18);
-      });
-    }
+    const frameIndex = index % frames.length;
+    const frame = frames[frameIndex];
+    const frameName = getBackgroundDrifterFrameName(era.key, frameIndex);
 
-    if (item.kind === "mote") {
-      item.obj.setFillStyle(eraColors.mote, era === "cyberpunk" ? 0.38 : 0.24);
-    }
+    item.obj.setTexture(era.bgKey, frameName);
+    item.obj.setScale(frame.scale);
+    item.obj.setAlpha(frame.alpha);
+    item.obj.setDepth(-8);
+
+    item.speed = frame.speed;
+    item.yMin = frame.yMin;
+    item.yMax = frame.yMax;
   });
 };
 
 PlayScene.prototype.updateAtmosphere = function () {
   if (!this.atmosphereItems) return;
 
-  const { width, height } = this.scale;
-  const deltaSeconds = this.game.loop.delta / 1000;
+  const { width } = this.scale;
+  const deltaSeconds = Math.min(this.game.loop.delta / 1000, 0.05);
 
   this.atmosphereItems.forEach(item => {
     if (!item.obj || !item.obj.scene) return;
 
     item.obj.x -= item.speed * deltaSeconds;
-    item.obj.y += Math.sin(this.time.now * 0.001 + item.obj.x * 0.02) * item.drift;
+    item.obj.y += Math.sin(this.time.now * 0.001 + item.phase) * item.drift;
 
-    if (item.obj.x < -120) {
-      item.obj.x = width + Phaser.Math.Between(20, 160);
-      item.obj.y = item.kind === "cloud"
-        ? Phaser.Math.Between(70, height - 230)
-        : Phaser.Math.Between(40, height - 90);
+    if (item.obj.x < -item.obj.displayWidth - 40) {
+      item.obj.x = width + Phaser.Math.Between(40, 180);
+      item.obj.y = Phaser.Math.Between(item.yMin, item.yMax);
     }
   });
 };
@@ -1429,7 +1451,7 @@ PlayScene.prototype.applyEraVisuals = function () {
     this.eraText.setScale(1);
     this.eraText.setAlpha(0.85);
   }
-  
+
   this.refreshAtmosphereVisuals();
 
 };
