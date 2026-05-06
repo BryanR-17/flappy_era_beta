@@ -733,35 +733,45 @@ PlayScene.prototype.createGroups = function () {
 };
 
 PlayScene.prototype.createHud = function (width, height) {
-  this.scorePanel = this.add.rectangle(width/2, 42, 150, 72, 0x000000, 0.32)
-    .setStrokeStyle(2, 0xffffff, 0.25);
-
-  this.scoreLabel = this.add.text(width/2, 23, "SCORE", {
-    fontFamily: "Arial Black", fontSize: "14px", color: "#d9f7ff"
+  this.scoreLabel = this.add.text(width / 2, 20, "SCORE", {
+    fontFamily: "Arial Black",
+    fontSize: "14px",
+    color: "#d9f7ff",
+    stroke: "#000000",
+    strokeThickness: 3
   }).setOrigin(0.5);
 
-  this.scoreText = this.add.text(width/2, 40, "0", {
-    fontFamily: "Arial Black", fontSize: "40px", color: "#ffffff",
-    stroke: "#000000", strokeThickness: 6
+  this.scoreText = this.add.text(width / 2, 50, "0", {
+    fontFamily: "Arial Black",
+    fontSize: "42px",
+    color: "#ffffff",
+    stroke: "#000000",
+    strokeThickness: 7
   }).setOrigin(0.5);
 
-  this.eraText = this.add.text(width/2, 80, ERAS[this.eraIndex].name, {
-    fontFamily: "Arial Black", fontSize: "16px", color: "#ffffff"
-  }).setOrigin(0.5).setAlpha(0.8);
+  this.eraText = this.add.text(width / 2, 94, ERAS[this.eraIndex].name, {
+    fontFamily: "Arial Black",
+    fontSize: "18px",
+    color: "#ffffff",
+    stroke: "#000000",
+    strokeThickness: 4
+  }).setOrigin(0.5).setAlpha(0.9);
 
   this.runCoinText = this.add.text(14, 14, "Coins: 0", {
-    fontFamily: "Arial Black", fontSize: "18px", color: "#ffd66b",
-    stroke: "#000000", strokeThickness: 4
+    fontFamily: "Arial Black",
+    fontSize: "18px",
+    color: "#ffd66b",
+    stroke: "#000000",
+    strokeThickness: 4
   }).setOrigin(0, 0);
 
-  this.scorePanel.setDepth(3);
   this.scoreLabel.setDepth(4);
   this.scoreText.setDepth(4);
   this.eraText.setDepth(4);
   this.runCoinText.setDepth(4);
 
   // Reused for era switches so we get a transition without destroying old images.
-  this.eraFlash = this.add.rectangle(width/2, height/2, width, height, 0xffffff, 0)
+  this.eraFlash = this.add.rectangle(width / 2, height / 2, width, height, 0xffffff, 0)
     .setDepth(6)
     .setVisible(false);
 };
@@ -1016,28 +1026,15 @@ PlayScene.prototype.emitFlapParticles = function () {
 };
 
 PlayScene.prototype.animateScoreUi = function () {
-  if (!this.scoreText || !this.scorePanel) return;
+  if (!this.scoreText) return;
 
   this.tweens.killTweensOf(this.scoreText);
-  this.tweens.killTweensOf(this.scorePanel);
 
   this.scoreText.setScale(1);
-  this.scorePanel.setScale(1);
-  this.scorePanel.setAlpha(0.32);
 
   this.tweens.add({
     targets: this.scoreText,
-    scale: 1.14,
-    duration: 110,
-    yoyo: true,
-    ease: "Sine.easeOut"
-  });
-
-  this.tweens.add({
-    targets: this.scorePanel,
-    alpha: 0.55,
-    scaleX: 1.04,
-    scaleY: 1.08,
+    scale: 1.16,
     duration: 110,
     yoyo: true,
     ease: "Sine.easeOut"
@@ -1150,14 +1147,17 @@ PlayScene.prototype.spawnPipePair = function () {
   centerY = Phaser.Math.Clamp(centerY, minCenterY, maxCenterY);
   this.lastPipeCenterY = centerY;
 
-  const topH = Math.max(centerY - halfGap, 20);
-  const botY = centerY + halfGap;
-  const botH = Math.max(height - botY - 40, 20);
+const pipeOverscan = 90;
+const topGapBottom = centerY - halfGap;
+const botY = centerY + halfGap;
+
+const topH = Math.max(topGapBottom + pipeOverscan, 20);
+const botH = Math.max(height - botY + pipeOverscan, 20);
 
   const PIPE_W = 60;
   const VISUAL_W = PIPE_W * PILLAR_WIDTH_MULT;
 
-  const topBody = this.pipes.create(width + 60, topH / 2, "pipeBodyTex")
+  const topBody = this.pipes.create(width + 60, topH / 2 - pipeOverscan, "pipeBodyTex")
     .setDisplaySize(PIPE_W, topH)
     .setOrigin(0.5)
     .setAlpha(0);
@@ -1171,7 +1171,7 @@ PlayScene.prototype.spawnPipePair = function () {
 
   const topVisual = buildVoxelPipe(this, eraKey, VISUAL_W, topH, true);
   topVisual.x = topBody.x;
-  topVisual.y = topH;
+  topVisual.y = topH - pipeOverscan;
 
   const bottomVisual = buildVoxelPipe(this, eraKey, VISUAL_W, botH, false);
   bottomVisual.x = bottomBody.x;
@@ -1187,7 +1187,7 @@ PlayScene.prototype.spawnPipePair = function () {
 
   const coinSpawnChance = 0.7;
   if (Math.random() < coinSpawnChance) {
-    const coinYMin = topH + 45;
+    const coinYMin = topGapBottom + 45;
     const coinYMax = botY - 45;
 
     if (coinYMax > coinYMin) {
