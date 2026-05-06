@@ -10,6 +10,98 @@ const SCALES = {
   HITBOX: 0.70
 };
 
+// --- Text style tuning
+const FONT = {
+  DISPLAY: '"Arial Black", Impact, sans-serif',
+  BODY: '"Trebuchet MS", Verdana, sans-serif'
+};
+
+const TEXT_STYLE = {
+  TITLE: {
+    fontFamily: FONT.DISPLAY,
+    fontSize: "46px",
+    color: "#f7ffff",
+    stroke: "#35e6f0",
+    strokeThickness: 7,
+    shadow: { offsetX: 4, offsetY: 5, color: "#071014", blur: 0, stroke: true, fill: true }
+  },
+
+  SUBTITLE: {
+    fontFamily: FONT.BODY,
+    fontSize: "18px",
+    color: "#cfe8f3",
+    stroke: "#071014",
+    strokeThickness: 2
+  },
+
+  HEADING: {
+    fontFamily: FONT.DISPLAY,
+    fontSize: "24px",
+    color: "#ffffff",
+    stroke: "#071014",
+    strokeThickness: 5
+  },
+
+  HUD_LABEL: {
+    fontFamily: FONT.DISPLAY,
+    fontSize: "14px",
+    color: "#d9f7ff",
+    stroke: "#071014",
+    strokeThickness: 3
+  },
+
+  HUD_NUMBER: {
+    fontFamily: FONT.DISPLAY,
+    fontSize: "42px",
+    color: "#ffffff",
+    stroke: "#071014",
+    strokeThickness: 7
+  },
+
+  ERA: {
+    fontFamily: FONT.DISPLAY,
+    fontSize: "18px",
+    color: "#ffffff",
+    stroke: "#071014",
+    strokeThickness: 4
+  },
+
+  COINS: {
+    fontFamily: FONT.DISPLAY,
+    fontSize: "18px",
+    color: "#ffd66b",
+    stroke: "#071014",
+    strokeThickness: 4
+  },
+
+  PROMPT: {
+    fontFamily: FONT.DISPLAY,
+    fontSize: "26px",
+    color: "#ffffff",
+    align: "center",
+    stroke: "#071014",
+    strokeThickness: 7
+  },
+
+  DANGER_TITLE: {
+    fontFamily: FONT.DISPLAY,
+    fontSize: "30px",
+    color: "#ff7777",
+    stroke: "#160708",
+    strokeThickness: 6
+  },
+
+  BUTTON: {
+    fontFamily: FONT.DISPLAY,
+    fontSize: "18px",
+    color: "#10131b"
+  }
+};
+
+function textStyle(base, overrides = {}) {
+  return { ...base, ...overrides };
+}
+
 // Thicker voxel pipes
 const PILLAR_WIDTH_MULT = 2.5;
 
@@ -265,14 +357,11 @@ MenuScene.prototype.create = function () {
 
   createEraMenuBackground(this);
 
-  this.add.text(width/2, 110, "FLAPPY ERAS", {
-    fontFamily: "Arial Black", fontSize: "46px", color: "#ffffff",
-    stroke: "#7cf5ff", strokeThickness: 6
-  }).setOrigin(0.5);
+  this.add.text(width / 2, 110, "FLAPPY ERAS", textStyle(TEXT_STYLE.TITLE))
+    .setOrigin(0.5);
 
-  this.add.text(width/2, 160, "Glide through time.", {
-    fontFamily: "Arial", fontSize: "18px", color: "#cfcfe8"
-  }).setOrigin(0.5);
+  this.add.text(width/2, 160, "Glide through time.", textStyle(TEXT_STYLE.SUBTITLE))
+    .setOrigin(0.5);
 
   const selectedKey = this.registry.get(REG.CHARACTER);
   const charObj = CHARACTERS.find(c => c.key === selectedKey) || CHARACTERS[0];
@@ -733,37 +822,18 @@ PlayScene.prototype.createGroups = function () {
 };
 
 PlayScene.prototype.createHud = function (width, height) {
-  this.scoreLabel = this.add.text(width / 2, 20, "SCORE", {
-    fontFamily: "Arial Black",
-    fontSize: "14px",
-    color: "#d9f7ff",
-    stroke: "#000000",
-    strokeThickness: 3
-  }).setOrigin(0.5);
+  this.scoreLabel = this.add.text(width / 2, 20, "SCORE", TEXT_STYLE.HUD_LABEL)
+    .setOrigin(0.5);
 
-  this.scoreText = this.add.text(width / 2, 50, "0", {
-    fontFamily: "Arial Black",
-    fontSize: "42px",
-    color: "#ffffff",
-    stroke: "#000000",
-    strokeThickness: 7
-  }).setOrigin(0.5);
+  this.scoreText = this.add.text(width / 2, 50, "0", TEXT_STYLE.HUD_NUMBER)
+    .setOrigin(0.5);
 
-  this.eraText = this.add.text(width / 2, 94, ERAS[this.eraIndex].name, {
-    fontFamily: "Arial Black",
-    fontSize: "18px",
-    color: "#ffffff",
-    stroke: "#000000",
-    strokeThickness: 4
-  }).setOrigin(0.5).setAlpha(0.9);
+  this.eraText = this.add.text(width / 2, 94, ERAS[this.eraIndex].name, TEXT_STYLE.ERA)
+    .setOrigin(0.5)
+    .setAlpha(0.9);
 
-  this.runCoinText = this.add.text(14, 14, "Coins: 0", {
-    fontFamily: "Arial Black",
-    fontSize: "18px",
-    color: "#ffd66b",
-    stroke: "#000000",
-    strokeThickness: 4
-  }).setOrigin(0, 0);
+  this.runCoinText = this.add.text(14, 14, "Coins: 0", TEXT_STYLE.COINS)
+    .setOrigin(0, 0);
 
   this.scoreLabel.setDepth(4);
   this.scoreText.setDepth(4);
@@ -779,14 +849,12 @@ PlayScene.prototype.createHud = function (width, height) {
 PlayScene.prototype.createStartPrompt = function (width, height) {
   this.startPromptBg = null;
 
-  this.startPrompt = this.add.text(width / 2, height - 135, "Tap to Start\nPress Space to Start", {
-    fontFamily: "Arial Black",
-    fontSize: "24px",
-    color: "#ffffff",
-    align: "center",
-    stroke: "#000000",
-    strokeThickness: 6
-  }).setOrigin(0.5);
+  this.startPrompt = this.add.text(
+    width / 2,
+    height - 135,
+    "Tap to Start\nPress Space to Start",
+    TEXT_STYLE.PROMPT
+  ).setOrigin(0.5);
 
   this.startPrompt.setDepth(5);
 };
@@ -1374,13 +1442,8 @@ GameOverScene.prototype.create = function () {
 
   this.add.rectangle(width / 2, height / 2, width, height, 0x0d0d12);
 
-  this.add.text(width / 2, 92, "YOU TIME-LAPSED!", {
-    fontFamily: "Arial Black",
-    fontSize: "30px",
-    color: "#ff7777",
-    stroke: "#000000",
-    strokeThickness: 6
-  }).setOrigin(0.5);
+  this.add.text(width / 2, 92, "YOU TIME-LAPSED!", TEXT_STYLE.DANGER_TITLE)
+    .setOrigin(0.5);
 
   if (this.isNewBest) {
     this.add.text(width / 2, 136, "NEW BEST!", {
@@ -1462,11 +1525,11 @@ function makeButton(scene, x, y, w, h, color, label, opts = {}) {
     .setStrokeStyle(4, 0xffffff)
     .setInteractive({ useHandCursor: true });
 
-  const btnText = scene.add.text(x, y, label, {
-    fontFamily: "Arial Black",
+  const btnText = scene.add.text(x, y, label, textStyle(TEXT_STYLE.BUTTON, {
     fontSize: `${fontSize}px`,
     color: textColor
-  }).setOrigin(0.5);
+  })).setOrigin(0.5);
+
 
   if (hoverScale !== 1.0) {
     btnBg.on("pointerover", () => btnBg.setScale(hoverScale));
