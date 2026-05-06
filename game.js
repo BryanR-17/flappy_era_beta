@@ -777,19 +777,17 @@ PlayScene.prototype.createHud = function (width, height) {
 };
 
 PlayScene.prototype.createStartPrompt = function (width, height) {
-  this.startPromptBg = this.add.rectangle(width/2, height - 120, 280, 80, 0x000000, 0.42)
-    .setStrokeStyle(2, 0xffffff, 0.35);
+  this.startPromptBg = null;
 
-  this.startPrompt = this.add.text(width/2, height - 120, "Tap to Start\nPress Space to Start", {
+  this.startPrompt = this.add.text(width / 2, height - 135, "Tap to Start\nPress Space to Start", {
     fontFamily: "Arial Black",
-    fontSize: "22px",
+    fontSize: "24px",
     color: "#ffffff",
     align: "center",
     stroke: "#000000",
     strokeThickness: 6
   }).setOrigin(0.5);
 
-  this.startPromptBg.setDepth(4);
   this.startPrompt.setDepth(5);
 };
 
@@ -818,7 +816,7 @@ PlayScene.prototype.setupInputHandlers = function () {
   });
 
   this.startPromptTween = this.tweens.add({
-    targets: [this.startPromptBg, this.startPrompt],
+    targets: this.startPrompt,
     alpha: 0.72,
     duration: 850,
     yoyo: true,
@@ -1058,22 +1056,19 @@ PlayScene.prototype.startRun = function () {
   this.player.body.reset(this.player.x, this.player.y);
   this.player.body.setAllowGravity(true);
 
-  this.startPromptFadeTween = this.tweens.add({
-    targets: [this.startPromptBg, this.startPrompt],
-    alpha: 0,
-    duration: 180,
-    onComplete: () => {
-      if (this.startPromptBg) {
-      this.startPromptBg.setVisible(false);
-      this.startPromptBg.setActive(false);
-      } 
+this.startPromptFadeTween = this.tweens.add({
+  targets: this.startPrompt,
+  alpha: 0,
+  duration: 180,
+  onComplete: () => {
+    if (this.startPrompt) {
+      this.startPrompt.setVisible(false);
+      this.startPrompt.setActive(false);
+    }
 
-      if (this.startPrompt) {
-        this.startPrompt.setVisible(false);
-        this.startPrompt.setActive(false);
-      }
-    }   
-  }); 
+    this.startPromptFadeTween = null;
+  }
+});
 
   this.scheduleNextPipe(this.firstPipeDelay);
 };
