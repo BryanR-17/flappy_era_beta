@@ -719,6 +719,7 @@ PlayScene.prototype.create = function () {
 
   this.ensurePipeBodyTexture();
   this.applyEraVisuals();
+  this.createAtmosphereLayer(width, height);
   this.createPlayer(width, height);
   this.createGroups();
   this.createHud(width, height);
@@ -775,6 +776,7 @@ PlayScene.prototype.resetRunState = function () {
   this.coins = null;
   this.ground = null;
   this.flapParticles = null;
+  this.atmosphereItems = [];
 
   this.eraIndex = 0;
 };
@@ -871,6 +873,108 @@ PlayScene.prototype.createFlapParticles = function () {
     emitting: false
   });
   this.flapParticles.setDepth(1);
+};
+
+PlayScene.prototype.createAtmosphereLayer = function (width, height) {
+  this.atmosphereItems = [];
+
+  // Big soft clouds drifting behind gameplay.
+  for (let i = 0; i < 5; i++) {
+    const cloud = this.add.container(
+      Phaser.Math.Between(0, width),
+      Phaser.Math.Between(70, height - 220)
+    );
+
+    const puffColor = 0xffffff;
+    const puffAlpha = 0.18;
+
+    cloud.add(this.add.ellipse(-28, 0, 70, 28, puffColor, puffAlpha));
+    cloud.add(this.add.ellipse(14, -8, 82, 34, puffColor, puffAlpha));
+    cloud.add(this.add.ellipse(52, 2, 58, 24, puffColor, puffAlpha));
+
+    cloud.setDepth(-8);
+    cloud.setScale(Phaser.Math.FloatBetween(0.75, 1.25));
+
+    this.atmosphereItems.push({
+      obj: cloud,
+      speed: Phaser.Math.FloatBetween(8, 16),
+      drift: Phaser.Math.FloatBetween(0.15, 0.35),
+      kind: "cloud"
+    });
+  }
+
+  // Small floating motes give the scene subtle motion without being distracting.
+  for (let i = 0; i < 16; i++) {
+    const mote = this.add.rectangle(
+      Phaser.Math.Between(0, width),
+      Phaser.Math.Between(40, height - 80),
+      Phaser.Math.Between(2, 5),
+      Phaser.Math.Between(2, 5),
+      0xffffff,
+      0.24
+    );
+
+    mote.setDepth(-7);
+
+    this.atmosphereItems.push({
+      obj: mote,
+      speed: Phaser.Math.FloatBetween(12, 26),
+      drift: Phaser.Math.FloatBetween(0.25, 0.65),
+      kind: "mote"
+    });
+  }
+
+  this.refreshAtmosphereVisuals();
+};
+
+PlayScene.prototype.refreshAtmosphereVisuals = function () {
+  if (!this.atmosphereItems) return;
+
+  const era = ERAS[this.eraIndex].key;
+
+  const colors = {
+    prehistoric: { cloud: 0xffffff, mote: 0xffefb0 },
+    medieval: { cloud: 0xfff0c8, mote: 0xd8ff9f },
+    cyberpunk: { cloud: 0x7cf5ff, mote: 0xff4dff },
+    space: { cloud: 0x9bbcff, mote: 0xffffff }
+  };
+
+  const eraColors = colors[era] || colors.prehistoric;
+
+  this.atmosphereItems.forEach(item => {
+    if (!item.obj || !item.obj.scene) return;
+
+    if (item.kind === "cloud") {
+      item.obj.list.forEach(part => {
+        part.setFillStyle(eraColors.cloud, era === "space" ? 0.10 : 0.18);
+      });
+    }
+
+    if (item.kind === "mote") {
+      item.obj.setFillStyle(eraColors.mote, era === "cyberpunk" ? 0.38 : 0.24);
+    }
+  });
+};
+
+PlayScene.prototype.updateAtmosphere = function () {
+  if (!this.atmosphereItems) return;
+
+  const { width, height } = this.scale;
+  const deltaSeconds = this.game.loop.delta / 1000;
+
+  this.atmosphereItems.forEach(item => {
+    if (!item.obj || !item.obj.scene) return;
+
+    item.obj.x -= item.speed * deltaSeconds;
+    item.obj.y += Math.sin(this.time.now * 0.001 + item.obj.x * 0.02) * item.drift;
+
+    if (item.obj.x < -120) {
+      item.obj.x = width + Phaser.Math.Between(20, 160);
+      item.obj.y = item.kind === "cloud"
+        ? Phaser.Math.Between(70, height - 230)
+        : Phaser.Math.Between(40, height - 90);
+    }
+  });
 };
 
 PlayScene.prototype.setupInputHandlers = function () {
@@ -977,6 +1081,10 @@ PlayScene.prototype.setupCollisions = function (width, height) {
 };
 
 PlayScene.prototype.update = function () {
+  if (!this.isGameOver) {
+    this.updateAtmosphere();
+  }
+
   if (
     this.isGameOver ||
     !this.player ||
@@ -1321,6 +1429,9 @@ PlayScene.prototype.applyEraVisuals = function () {
     this.eraText.setScale(1);
     this.eraText.setAlpha(0.85);
   }
+  
+  this.refreshAtmosphereVisuals();
+
 };
 
 PlayScene.prototype.switchEra = function () {
