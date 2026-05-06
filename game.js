@@ -41,10 +41,10 @@ const CHARACTERS = [
 // Shop prices
 const CHARACTER_COSTS = {
   dino: 0,
-  bird: 100,
-  robot: 120,
-  cat: 120,
-  alien: 140
+  bird: 200,
+  robot: 320,
+  cat: 320,
+  alien: 540
 };
 
 // LocalStorage keys
@@ -749,7 +749,7 @@ PlayScene.prototype.createHud = function (width, height) {
     fontFamily: "Arial Black", fontSize: "16px", color: "#ffffff"
   }).setOrigin(0.5).setAlpha(0.8);
 
-  this.runCoinText = this.add.text(14, 14, "Run Coins: 0", {
+  this.runCoinText = this.add.text(14, 14, "Coins: 0", {
     fontFamily: "Arial Black", fontSize: "18px", color: "#ffd66b",
     stroke: "#000000", strokeThickness: 4
   }).setOrigin(0, 0);
@@ -1229,7 +1229,7 @@ PlayScene.prototype.collectCoin = function (_sensor, coin) {
   this.runCoins += 1;
 
   if (this.runCoinText) {
-    this.runCoinText.setText(`Run Coins: ${this.runCoins}`);
+    this.runCoinText.setText(`Coins: ${this.runCoins}`);
   }
 };
 
@@ -1402,7 +1402,7 @@ GameOverScene.prototype.create = function () {
   this.add.rectangle(width / 2, cardY, 315, 170, 0x171722, 0.9)
     .setStrokeStyle(3, this.isNewBest ? 0xffef85 : 0xffffff, 0.55);
 
-  this.add.text(width / 2, cardY - 62, "RUN SUMMARY", {
+  this.add.text(width / 2, cardY - 62, "SUMMARY", {
     fontFamily: "Arial Black",
     fontSize: "16px",
     color: "#d9f7ff",
@@ -1426,7 +1426,7 @@ GameOverScene.prototype.create = function () {
     strokeThickness: 3
   }).setOrigin(0.5);
 
-  this.add.text(width / 2, cardY + 42, `Run Coins: +${this.runCoins}`, {
+  this.add.text(width / 2, cardY + 42, `Coins: +${this.runCoins}`, {
     fontFamily: "Arial Black",
     fontSize: "18px",
     color: "#ffd66b",
