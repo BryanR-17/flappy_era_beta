@@ -982,9 +982,17 @@ PlayScene.prototype.updateAtmosphere = function () {
       : -140;
 
     if (item.obj.x < resetX) {
-      item.obj.x = width + Phaser.Math.Between(80, 260);
-      item.obj.y = Phaser.Math.Between(item.yMin, item.yMax);
+    item.obj.x = width + item.obj.displayWidth + Phaser.Math.Between(120, 320);
+    item.obj.y = Phaser.Math.Between(item.yMin, item.yMax);
+
+    if (item.kind === "cloud") {
+      item.speed = Phaser.Math.FloatBetween(1.4, 3.2);
+      item.drift = Phaser.Math.FloatBetween(0.01, 0.035);
+      item.obj.setAlpha(Phaser.Math.FloatBetween(0.22, 0.36));
+      item.obj.setScale(Phaser.Math.FloatBetween(0.22, 0.34));
+      item.obj.setFlipX(Math.random() < 0.5);
     }
+  }
   });
 };
 
