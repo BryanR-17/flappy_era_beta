@@ -110,7 +110,8 @@ const ASSET_PATHS = {
   COIN: "assets/coin.png",
   CHARACTERS: "assets/characters",
   ERAS: "assets/eras",
-  PIPES: "assets/pipes"
+  PIPES: "assets/pipes",
+  EFFECTS: "assets/effects"
 };
 
 // Registry keys
@@ -308,6 +309,7 @@ BootScene.prototype.preload = function () {
   });
 
   this.load.image("coin", ASSET_PATHS.COIN);
+  this.load.image("cloud_screenshot", `${ASSET_PATHS.EFFECTS}/cloud_screenshot.png`);
 };
 
 BootScene.prototype.create = function () {
@@ -873,60 +875,45 @@ PlayScene.prototype.createFlapParticles = function () {
   this.flapParticles.setDepth(1);
 };
 
-function createVoxelCloud(scene, x, y, color, alpha, scale) {
-  const cloud = scene.add.container(x, y);
-
-  const blocks = [
-    [-54, 8, 44, 24],
-    [-24, -4, 48, 32],
-    [12, -12, 58, 38],
-    [52, 4, 46, 26],
-    [0, 18, 82, 20]
-  ];
-
-  blocks.forEach(block => {
-    const rect = scene.add.rectangle(block[0], block[1], block[2], block[3], color, alpha);
-    cloud.add(rect);
-  });
-
-  cloud.setScale(scale);
-  cloud.setDepth(-8);
-
-  return cloud;
-}
-
 function createAtmosphereChip(scene, x, y, color, alpha, size) {
   const chip = scene.add.rectangle(x, y, size, size, color, alpha);
   chip.setDepth(-8);
   return chip;
 }
 
+function createMovingCloud(scene, x, y) {
+  const cloud = scene.add.image(x, y, "cloud_screenshot");
+
+  cloud.setDepth(-8);
+  cloud.setAlpha(Phaser.Math.FloatBetween(0.34, 0.52));
+  cloud.setScale(Phaser.Math.FloatBetween(0.10, 0.18));
+  cloud.setFlipX(Math.random() < 0.5);
+
+  return cloud;
+}
+
 PlayScene.prototype.createAtmosphereLayer = function (width, height) {
   this.atmosphereItems = [];
 
   const eraKey = ERAS[this.eraIndex].key;
-
   const isCloudEra = eraKey === "prehistoric" || eraKey === "medieval";
 
   if (isCloudEra) {
     for (let i = 0; i < 5; i++) {
-      const cloud = createVoxelCloud(
+      const cloud = createMovingCloud(
         this,
-        Phaser.Math.Between(0, width),
-        Phaser.Math.Between(75, 210),
-        eraKey === "medieval" ? 0xffefc2 : 0xfff0b5,
-        0.22,
-        Phaser.Math.FloatBetween(0.55, 0.9)
+        Phaser.Math.Between(-80, width + 180),
+        Phaser.Math.Between(65, 210)
       );
 
       this.atmosphereItems.push({
         obj: cloud,
         kind: "cloud",
-        speed: Phaser.Math.FloatBetween(5, 11),
-        drift: Phaser.Math.FloatBetween(0.08, 0.18),
+        speed: Phaser.Math.FloatBetween(4, 9),
+        drift: Phaser.Math.FloatBetween(0.04, 0.10),
         phase: Phaser.Math.FloatBetween(0, Math.PI * 2),
-        yMin: 70,
-        yMax: 215
+        yMin: 65,
+        yMax: 210
       });
     }
 
@@ -984,12 +971,17 @@ PlayScene.prototype.updateAtmosphere = function () {
     item.obj.x -= item.speed * deltaSeconds;
     item.obj.y += Math.sin(this.time.now * 0.001 + item.phase) * item.drift;
 
-    if (item.obj.x < -140) {
-      item.obj.x = width + Phaser.Math.Between(40, 180);
+    const resetX = item.kind === "cloud"
+      ? -item.obj.displayWidth - 80
+      : -140;
+
+    if (item.obj.x < resetX) {
+      item.obj.x = width + Phaser.Math.Between(80, 260);
       item.obj.y = Phaser.Math.Between(item.yMin, item.yMax);
     }
   });
 };
+
 
 PlayScene.prototype.setupInputHandlers = function () {
   this.idleFloatTween = this.tweens.add({
