@@ -1626,6 +1626,23 @@ GameOverScene.prototype.init = function (data) {
   this.isNewBest = data.isNewBest || false;
 };
 
+function createVoxelPanel(scene, x, y, w, h, color, accentColor) {
+  const sideColor = Phaser.Display.Color.IntegerToColor(color).darken(25).color;
+  const topColor = Phaser.Display.Color.IntegerToColor(color).lighten(18).color;
+
+  const shadow = scene.add.rectangle(x + 6, y + 8, w, h, 0x000000, 0.38);
+  const side = scene.add.rectangle(x + w / 2 - 7, y + 4, 14, h, sideColor, 0.85);
+  const bottom = scene.add.rectangle(x, y + h / 2 - 7, w, 14, sideColor, 0.9);
+
+  const face = scene.add.rectangle(x, y, w, h, color, 0.94)
+    .setStrokeStyle(3, accentColor, 0.7);
+
+  const top = scene.add.rectangle(x, y - h / 2 + 8, w - 14, 10, topColor, 0.45);
+  const shine = scene.add.rectangle(x - w / 2 + 24, y - h / 2 + 26, 32, 7, 0xffffff, 0.16);
+
+  return { shadow, side, bottom, face, top, shine };
+}
+
 GameOverScene.prototype.create = function () {
   const { width, height } = this.scale;
 
@@ -1646,16 +1663,22 @@ GameOverScene.prototype.create = function () {
 
   const cardY = 244;
 
-  this.add.rectangle(width / 2, cardY, 315, 170, 0x171722, 0.9)
-    .setStrokeStyle(3, this.isNewBest ? 0xffef85 : 0xffffff, 0.55);
+  createVoxelPanel(
+    this,
+    width / 2,
+    cardY,
+    315,
+    170,
+    0x171722,
+    this.isNewBest ? 0xffef85 : 0x7cf5ff
+  );
 
-  this.add.text(width / 2, cardY - 62, "SUMMARY", {
-    fontFamily: "Arial Black",
+
+  this.add.text(width / 2, cardY - 62, "SUMMARY", textStyle(TEXT_STYLE.HUD_LABEL, {
     fontSize: "16px",
-    color: "#d9f7ff",
-    stroke: "#000000",
-    strokeThickness: 3
-  }).setOrigin(0.5);
+    color: "#d9f7ff"
+  })).setOrigin(0.5);
+
 
   this.add.text(width / 2, cardY - 28, `Score: ${this.finalScore}`, {
     fontFamily: "Arial Black",
@@ -1706,26 +1729,68 @@ GameOverScene.prototype.create = function () {
    BUTTON MAKER (supports options)
    ========================================================= */
 function makeButton(scene, x, y, w, h, color, label, opts = {}) {
-  const hoverScale = typeof opts.hoverScale === "number" ? opts.hoverScale : 1.05;
+  const hoverScale = typeof opts.hoverScale === "number" ? opts.hoverScale : 1.03;
   const fontSize = typeof opts.fontSize === "number" ? opts.fontSize : 18;
-  const textColor = opts.textColor || "#000000";
+  const textColor = opts.textColor || "#10131b";
+
+  const depth = 7;
+  const shadowColor = opts.shadowColor || 0x05070a;
+
+  const darkColor = Phaser.Display.Color.IntegerToColor(color).darken(28).color;
+  const lightColor = Phaser.Display.Color.IntegerToColor(color).lighten(18).color;
+
+  const shadow = scene.add.rectangle(x + 4, y + depth + 4, w, h, shadowColor, 0.38);
+  const side = scene.add.rectangle(x + w / 2 - 6, y + depth / 2, 12, h, darkColor, 0.75);
+  const bottom = scene.add.rectangle(x, y + h / 2 - 4, w, 10, darkColor, 0.8);
 
   const btnBg = scene.add.rectangle(x, y, w, h, color)
     .setStrokeStyle(4, 0xffffff)
     .setInteractive({ useHandCursor: true });
 
+  const top = scene.add.rectangle(x, y - h / 2 + 6, w - 10, 8, lightColor, 0.75);
+
   const btnText = scene.add.text(x, y, label, textStyle(TEXT_STYLE.BUTTON, {
     fontSize: `${fontSize}px`,
-    color: textColor
+    color: textColor,
+    stroke: "#ffffff",
+    strokeThickness: 1
   })).setOrigin(0.5);
 
+  const parts = [shadow, side, bottom, btnBg, top, btnText];
 
-  if (hoverScale !== 1.0) {
-    btnBg.on("pointerover", () => btnBg.setScale(hoverScale));
-    btnBg.on("pointerout", () => btnBg.setScale(1));
-  }
+  const setButtonY = (offsetY) => {
+    shadow.y = y + depth + 4;
+    side.y = y + depth / 2 + offsetY;
+    bottom.y = y + h / 2 - 4 + offsetY;
+    btnBg.y = y + offsetY;
+    top.y = y - h / 2 + 6 + offsetY;
+    btnText.y = y + offsetY;
+  };
+
+  const setButtonScale = (scale) => {
+    parts.forEach(part => part.setScale(scale));
+  };
+
+  btnBg.on("pointerover", () => {
+    setButtonScale(hoverScale);
+  });
+
+  btnBg.on("pointerout", () => {
+    setButtonScale(1);
+    setButtonY(0);
+  });
+
+  btnBg.on("pointerdown", () => {
+    setButtonY(4);
+  });
+
+  btnBg.on("pointerup", () => {
+    setButtonY(0);
+  });
 
   btnBg.text = btnText;
+  btnBg.parts = parts;
+
   return btnBg;
 }
 
