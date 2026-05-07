@@ -885,8 +885,10 @@ function createMovingCloud(scene, x, y) {
   const cloud = scene.add.image(x, y, "cloud_screenshot");
 
   cloud.setDepth(-8);
-  cloud.setAlpha(Phaser.Math.FloatBetween(0.34, 0.52));
-  cloud.setScale(Phaser.Math.FloatBetween(0.10, 0.18));
+
+  // Larger but softer, so the clouds feel like part of the painted background.
+  cloud.setAlpha(Phaser.Math.FloatBetween(0.22, 0.36));
+  cloud.setScale(Phaser.Math.FloatBetween(0.22, 0.34));
   cloud.setFlipX(Math.random() < 0.5);
 
   return cloud;
@@ -899,21 +901,24 @@ PlayScene.prototype.createAtmosphereLayer = function (width, height) {
   const isCloudEra = eraKey === "prehistoric" || eraKey === "medieval";
 
   if (isCloudEra) {
-    for (let i = 0; i < 5; i++) {
+    const cloudCount = 3;
+    const spacing = width / cloudCount;
+
+    for (let i = 0; i < cloudCount; i++) {
       const cloud = createMovingCloud(
         this,
-        Phaser.Math.Between(-80, width + 180),
-        Phaser.Math.Between(65, 210)
+        i * spacing + Phaser.Math.Between(-40, 80),
+        Phaser.Math.Between(70, 185)
       );
 
       this.atmosphereItems.push({
         obj: cloud,
         kind: "cloud",
-        speed: Phaser.Math.FloatBetween(4, 9),
-        drift: Phaser.Math.FloatBetween(0.04, 0.10),
+        speed: Phaser.Math.FloatBetween(1.4, 3.2),
+        drift: Phaser.Math.FloatBetween(0.01, 0.035),
         phase: Phaser.Math.FloatBetween(0, Math.PI * 2),
-        yMin: 65,
-        yMax: 210
+        yMin: 70,
+        yMax: 185
       });
     }
 
@@ -945,6 +950,7 @@ PlayScene.prototype.createAtmosphereLayer = function (width, height) {
     });
   }
 };
+
 
 PlayScene.prototype.refreshAtmosphereVisuals = function () {
   if (!this.atmosphereItems) return;
