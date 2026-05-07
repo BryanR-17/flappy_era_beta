@@ -217,48 +217,104 @@ function getGroupChildrenSafe(group) {
 function createEraMenuBackground(scene) {
   const { width, height } = scene.scale;
 
-  scene.add.rectangle(width / 2, height / 2, width, height, 0x081018);
+  // Deep blue-black base keeps the menu readable and arcade-like.
+  scene.add.rectangle(width / 2, height / 2, width, height, 0x071018);
 
-  const colors = [0x6bdc6b, 0xffc45c, 0x36f1ff, 0xb7b4ff];
+  // Soft horizon glow behind the character and buttons.
+  scene.add.rectangle(width / 2, height - 190, width, 240, 0x123040, 0.22);
+  scene.add.rectangle(width / 2, height - 95, width, 150, 0x061014, 0.45);
 
-  for (let i = 0; i < 4; i++) {
-    const x = 52 + i * 105;
+  // Big low-alpha spotlight triangle behind the selected character.
+  scene.add.triangle(
+    width / 2,
+    260,
+    0,
+    -210,
+    -120,
+    120,
+    120,
+    120,
+    0x7cf5ff,
+    0.08
+  );
 
-    const panel = scene.add.rectangle(x, height - 115, 82, 190, colors[i], 0.13)
-      .setStrokeStyle(2, colors[i], 0.3);
+  // Small pixel stars/dust. These are squares so they match the voxel style.
+  for (let i = 0; i < 32; i++) {
+    const size = Phaser.Math.Between(2, 5);
+
+    const star = scene.add.rectangle(
+      Phaser.Math.Between(18, width - 18),
+      Phaser.Math.Between(22, height - 225),
+      size,
+      size,
+      0xd9f7ff,
+      Phaser.Math.FloatBetween(0.16, 0.48)
+    );
 
     scene.tweens.add({
-      targets: panel,
-      y: panel.y - 8,
-      duration: 1400 + i * 180,
+      targets: star,
+      alpha: Phaser.Math.FloatBetween(0.05, 0.2),
+      duration: Phaser.Math.Between(900, 1900),
       yoyo: true,
       repeat: -1,
       ease: "Sine.easeInOut"
     });
   }
 
-  scene.add.triangle(62, height - 155, 0, 80, 42, 0, 84, 80, 0x1f5b34, 0.65);
-  scene.add.rectangle(160, height - 142, 42, 105, 0x6b5338, 0.7);
-  scene.add.rectangle(160, height - 204, 58, 24, 0x6b5338, 0.7);
-  scene.add.rectangle(260, height - 155, 18, 125, 0x18e7ff, 0.45);
-  scene.add.rectangle(290, height - 135, 14, 85, 0xff4df3, 0.45);
-  scene.add.circle(365, height - 190, 28, 0xdedbff, 0.45);
+  // Helper for blocky voxel rectangles with a small highlight and shadow.
+  const addVoxelBlock = (x, y, w, h, color, alpha = 0.75) => {
+    const block = scene.add.rectangle(x, y, w, h, color, alpha);
+    const top = scene.add.rectangle(x, y - h / 2 + 4, w, 8, 0xffffff, alpha * 0.12);
+    const side = scene.add.rectangle(x + w / 2 - 5, y, 10, h, 0x000000, alpha * 0.18);
 
-  for (let i = 0; i < 28; i++) {
-    const dot = scene.add.circle(
-      Phaser.Math.Between(10, width - 10),
-      Phaser.Math.Between(20, height - 210),
-      Phaser.Math.Between(1, 3),
-      0xffffff,
-      Phaser.Math.FloatBetween(0.2, 0.55)
+    return { block, top, side };
+  };
+
+  // Prehistoric block/tree silhouette on the left.
+  addVoxelBlock(52, height - 75, 78, 185, 0x143b27, 0.82);
+  addVoxelBlock(52, height - 160, 46, 74, 0x1f7a3d, 0.72);
+  addVoxelBlock(52, height - 120, 86, 34, 0x1c6d37, 0.72);
+  addVoxelBlock(52, height - 82, 22, 72, 0x7a542b, 0.75);
+
+  // Medieval tower silhouette.
+  addVoxelBlock(160, height - 72, 78, 195, 0x5c4a35, 0.76);
+  addVoxelBlock(160, height - 178, 96, 28, 0x8a7048, 0.72);
+  addVoxelBlock(128, height - 200, 18, 38, 0x8a7048, 0.7);
+  addVoxelBlock(160, height - 205, 18, 48, 0x8a7048, 0.7);
+  addVoxelBlock(192, height - 200, 18, 38, 0x8a7048, 0.7);
+
+  // Cyberpunk city silhouette.
+  addVoxelBlock(260, height - 72, 36, 205, 0x05323a, 0.86);
+  addVoxelBlock(292, height - 88, 42, 160, 0x063f48, 0.84);
+  addVoxelBlock(228, height - 92, 36, 145, 0x052a34, 0.82);
+
+  scene.add.rectangle(260, height - 144, 18, 72, 0x18e7ff, 0.48);
+  scene.add.rectangle(292, height - 128, 14, 58, 0xff4df3, 0.46);
+  scene.add.rectangle(228, height - 150, 10, 50, 0x7cf5ff, 0.35);
+
+  // Space/moon block silhouette on the right.
+  addVoxelBlock(365, height - 80, 88, 185, 0x1a1d33, 0.82);
+  addVoxelBlock(365, height - 165, 64, 64, 0x8f91aa, 0.75);
+  addVoxelBlock(384, height - 157, 24, 58, 0x70738c, 0.35);
+
+  // A few tiny floating voxel chunks for subtle motion.
+  for (let i = 0; i < 10; i++) {
+    const chunk = scene.add.rectangle(
+      Phaser.Math.Between(40, width - 40),
+      Phaser.Math.Between(height - 260, height - 130),
+      Phaser.Math.Between(6, 12),
+      Phaser.Math.Between(6, 14),
+      Phaser.Utils.Array.GetRandom([0x7cf5ff, 0xffd66b, 0x44dd77, 0xff4df3]),
+      Phaser.Math.FloatBetween(0.18, 0.32)
     );
 
     scene.tweens.add({
-      targets: dot,
-      alpha: Phaser.Math.FloatBetween(0.05, 0.25),
-      duration: Phaser.Math.Between(900, 1800),
+      targets: chunk,
+      y: chunk.y - Phaser.Math.Between(5, 12),
+      duration: Phaser.Math.Between(1300, 2300),
       yoyo: true,
-      repeat: -1
+      repeat: -1,
+      ease: "Sine.easeInOut"
     });
   }
 }
